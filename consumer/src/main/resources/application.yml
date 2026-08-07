@@ -1,3 +1,7 @@
+spring:
+  rabbitmq:
+    publisher-confirm-type: correlated
+
 detector:
   window-size: ${DETECTOR_WINDOW_SIZE:50}
   z-threshold: ${DETECTOR_Z_THRESHOLD:3.0}
