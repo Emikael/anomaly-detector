@@ -79,7 +79,9 @@ public final class DatapointGenerator {
         if (random.nextDouble() >= anomalyProbability) {
             return Optional.empty();
         }
-        double magnitude = random.nextDouble(anomalySigmaMin, anomalySigmaMax);
+        double magnitude = anomalySigmaMin == anomalySigmaMax
+                ? anomalySigmaMin
+                : random.nextDouble(anomalySigmaMin, anomalySigmaMax);
         double signedSigma = random.nextBoolean() ? magnitude : -magnitude;
         return Optional.of(new AnomalyInjection(signedSigma));
     }

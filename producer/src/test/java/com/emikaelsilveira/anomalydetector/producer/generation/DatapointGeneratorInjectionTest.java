@@ -44,6 +44,29 @@ class DatapointGeneratorInjectionTest {
     }
 
     @Test
+    void injectsAConstantMagnitudeWhenAnomalySigmaBoundsAreEqual() {
+        DatapointGenerator generator = new DatapointGenerator(
+                new Random(17),
+                Clock.fixed(Instant.parse("2026-08-05T14:22:07.361Z"), ZoneOffset.UTC),
+                () -> new UUID(0, 1),
+                100.0,
+                5.0,
+                1.0,
+                10.0,
+                10.0,
+                false,
+                400,
+                10.0
+        );
+
+        GeneratedDatapoint generated = generator.next();
+
+        double signedSigma = generated.anomalyInjection().orElseThrow().signedSigma();
+        assertThat(Math.abs(signedSigma)).isEqualTo(10.0);
+        assertThat(generated.datapoint().value()).isEqualTo(100.0 + signedSigma * 5.0);
+    }
+
+    @Test
     void serializedWireDatapointHasNoGroundTruthMetadata() throws Exception {
         DatapointGenerator generator = generator(new Random(2), 1.0, false, 400);
 
