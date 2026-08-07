@@ -1,0 +1,102 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "${RABBITMQ_AMQP_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - anomaly-detector-network
+    mem_limit: 512m
+    cpus: 1
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  consumer:
+    build:
+      context: .
+      dockerfile: consumer/Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      CONSUMER_HTTP_PORT: ${CONSUMER_HTTP_PORT}
+      DETECTOR_WINDOW_SIZE: ${DETECTOR_WINDOW_SIZE}
+      DETECTOR_Z_THRESHOLD: ${DETECTOR_Z_THRESHOLD}
+      DETECTOR_MIN_SAMPLES: ${DETECTOR_MIN_SAMPLES}
+      DETECTOR_EXCLUDE_ANOMALIES: ${DETECTOR_EXCLUDE_ANOMALIES}
+      DETECTOR_CONSECUTIVE_OVERRIDE: ${DETECTOR_CONSECUTIVE_OVERRIDE}
+      DETECTOR_SUMMARY_EVERY: ${DETECTOR_SUMMARY_EVERY}
+      LOG_FORMAT: ${LOG_FORMAT}
+    ports:
+      - "${CONSUMER_HTTP_PORT}:${CONSUMER_HTTP_PORT}"
+    networks:
+      - anomaly-detector-network
+    mem_limit: 512m
+    cpus: 0.5
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:${CONSUMER_HTTP_PORT}/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  producer:
+    build:
+      context: .
+      dockerfile: producer/Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      PRODUCER_HTTP_PORT: ${PRODUCER_HTTP_PORT}
+      PRODUCER_INTERVAL_MS: ${PRODUCER_INTERVAL_MS}
+      PRODUCER_MEAN: ${PRODUCER_MEAN}
+      PRODUCER_STDDEV: ${PRODUCER_STDDEV}
+      PRODUCER_ANOMALY_PROBABILITY: ${PRODUCER_ANOMALY_PROBABILITY}
+      PRODUCER_ANOMALY_SIGMA_MIN: ${PRODUCER_ANOMALY_SIGMA_MIN}
+      PRODUCER_ANOMALY_SIGMA_MAX: ${PRODUCER_ANOMALY_SIGMA_MAX}
+      PRODUCER_SEED: ${PRODUCER_SEED}
+      PRODUCER_LEVEL_SHIFT_ENABLED: ${PRODUCER_LEVEL_SHIFT_ENABLED}
+      PRODUCER_LEVEL_SHIFT_AT_SEQUENCE: ${PRODUCER_LEVEL_SHIFT_AT_SEQUENCE}
+      PRODUCER_LEVEL_SHIFT_SIGMA: ${PRODUCER_LEVEL_SHIFT_SIGMA}
+      LOG_FORMAT: ${LOG_FORMAT}
+    ports:
+      - "${PRODUCER_HTTP_PORT}:${PRODUCER_HTTP_PORT}"
+    networks:
+      - anomaly-detector-network
+    mem_limit: 512m
+    cpus: 0.5
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:${PRODUCER_HTTP_PORT}/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+networks:
+  anomaly-detector-network:
+    name: anomaly-detector-network
+
+volumes:
+  rabbitmq-data:
+    name: anomaly-detector-rabbitmq-data
