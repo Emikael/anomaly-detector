@@ -111,9 +111,9 @@ class DatapointPublisherIT {
                 .with(routingKey));
         try {
             CorrelationData first = publishPersistent(routingKey, "first");
-            CorrelationData second = publishPersistent(routingKey, "second");
-
             assertThat(first.getFuture().get(10, TimeUnit.SECONDS).ack()).isTrue();
+
+            CorrelationData second = publishPersistent(routingKey, "second");
             assertThat(second.getFuture().get(10, TimeUnit.SECONDS).ack()).isFalse();
         } finally {
             amqpAdmin.deleteQueue(queueName);
