@@ -34,12 +34,15 @@ final class RollingWindow {
     }
 
     double sampleStandardDeviation() {
+        return sampleStandardDeviation(mean());
+    }
+
+    double sampleStandardDeviation(double mean) {
         int size = values.size();
         if (size < 2) {
             return Double.NaN;
         }
 
-        double mean = mean();
         double squaredDeviationTotal = 0.0;
         for (double value : values) {
             double deviation = value - mean;
