@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://emikaelsilveira.com/schemas/datapoint.v1.schema.json",
+  "title": "Datapoint v1",
+  "type": "object",
+  "required": [
+    "id",
+    "sequence",
+    "metric",
+    "value",
+    "emittedAt"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "metric": {
+      "const": "sensor.temperature"
+    },
+    "value": {
+      "type": "number",
+      "minimum": -1e150,
+      "maximum": 1e150
+    },
+    "emittedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": true
+}
