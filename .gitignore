@@ -27,6 +27,9 @@ replay_pid*
 target/
 .mvn/timing.properties
 
+
+# jqwik generated database
+consumer/.jqwik-database
 # IDE metadata
 .idea/
 *.iml
