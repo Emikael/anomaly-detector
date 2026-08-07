@@ -1,0 +1,7 @@
+detector:
+  window-size: ${DETECTOR_WINDOW_SIZE:50}
+  z-threshold: ${DETECTOR_Z_THRESHOLD:3.0}
+  min-samples: ${DETECTOR_MIN_SAMPLES:30}
+  exclude-anomalies: ${DETECTOR_EXCLUDE_ANOMALIES:true}
+  consecutive-override: ${DETECTOR_CONSECUTIVE_OVERRIDE:5}
+  summary-every: ${DETECTOR_SUMMARY_EVERY:100}
