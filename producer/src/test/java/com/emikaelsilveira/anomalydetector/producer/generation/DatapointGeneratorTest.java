@@ -55,7 +55,8 @@ class DatapointGeneratorTest {
     void usesInjectedClockAndUuidAndTruncatesEventTimeToMilliseconds() {
         UUID id = UUID.fromString("0f3a9c1e-6b7d-4a2f-9c11-8de4b5a70c93");
         Clock clock = Clock.fixed(Instant.parse("2026-08-05T14:22:07.361987Z"), ZoneOffset.UTC);
-        DatapointGenerator generator = new DatapointGenerator(new Random(2), clock, () -> id, 100.0, 5.0, 0.0);
+        DatapointGenerator generator = new DatapointGenerator(
+                new Random(2), clock, () -> id, 100.0, 5.0, 0.0, 8.0, 12.0, false, 400, 10.0);
 
         Datapoint datapoint = generator.next().datapoint();
 
@@ -83,7 +84,12 @@ class DatapointGeneratorTest {
                 () -> UUID.randomUUID(),
                 100.0,
                 5.0,
-                0.0
+                0.0,
+                8.0,
+                12.0,
+                false,
+                400,
+                10.0
         );
 
         assertThat(generator.next().datapoint().value()).isEqualTo(expectedValue);
@@ -102,7 +108,8 @@ class DatapointGeneratorTest {
     private DatapointGenerator generator(Random random, Clock clock) {
         AtomicLong ids = new AtomicLong();
         Supplier<UUID> idSupplier = () -> new UUID(0, ids.incrementAndGet());
-        return new DatapointGenerator(random, clock, idSupplier, 100.0, 5.0, 0.0);
+        return new DatapointGenerator(
+                random, clock, idSupplier, 100.0, 5.0, 0.0, 8.0, 12.0, false, 400, 10.0);
     }
 
     private Schema schema() {
