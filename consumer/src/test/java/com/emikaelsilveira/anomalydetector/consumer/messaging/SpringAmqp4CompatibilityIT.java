@@ -11,6 +11,10 @@ import com.emikaelsilveira.anomalydetector.consumer.ConsumerApplication;
 import com.emikaelsilveira.anomalydetector.consumer.contract.Datapoint;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.DirectExchange;
+import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -18,6 +22,7 @@ import org.springframework.amqp.support.converter.DefaultJacksonJavaTypeMapper;
 import org.springframework.amqp.support.converter.JacksonJavaTypeMapper;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -37,6 +42,8 @@ class SpringAmqp4CompatibilityIT {
 
     private static final String PRODUCER_DATAPOINT_FQCN =
             "com.emikaelsilveira.anomalydetector.producer.contract.Datapoint";
+    private static final String COMPATIBILITY_QUEUE = "compatibility.datapoint.q";
+    private static final String COMPATIBILITY_ROUTING_KEY = "compatibility.datapoint";
 
     @Container
     private static final RabbitMQContainer RABBIT = new RabbitMQContainer(
@@ -50,7 +57,7 @@ class SpringAmqp4CompatibilityIT {
     private JacksonJsonMessageConverter converter;
 
     @Autowired
-    private DatapointListener listener;
+    private CompatibilityListener listener;
 
     @DynamicPropertySource
     static void rabbitProperties(DynamicPropertyRegistry registry) {
@@ -80,7 +87,7 @@ class SpringAmqp4CompatibilityIT {
         Object typeId = message.getMessageProperties().getHeader(DefaultJacksonJavaTypeMapper.DEFAULT_CLASSID_FIELD_NAME);
         assertThat(typeId).isEqualTo(PRODUCER_DATAPOINT_FQCN);
 
-        rabbitTemplate.send(RabbitTopology.METRICS_EXCHANGE, RabbitTopology.METRICS_ROUTING_KEY, message);
+        rabbitTemplate.send(RabbitTopology.METRICS_EXCHANGE, COMPATIBILITY_ROUTING_KEY, message);
 
         assertThat(listener.await()).isEqualTo(expected);
     }
@@ -89,17 +96,31 @@ class SpringAmqp4CompatibilityIT {
     static class CompatibilityConfiguration {
 
         @Bean
-        DatapointListener datapointListener() {
-            return new DatapointListener();
+        Queue compatibilityQueue() {
+            return new Queue(COMPATIBILITY_QUEUE, true);
         }
+
+        @Bean
+        Binding compatibilityBinding(
+                @Qualifier("compatibilityQueue") Queue queue,
+                @Qualifier("metricsExchange") DirectExchange exchange
+        ) {
+            return BindingBuilder.bind(queue).to(exchange).with(COMPATIBILITY_ROUTING_KEY);
+        }
+
+        @Bean
+        CompatibilityListener compatibilityListener() {
+            return new CompatibilityListener();
+        }
+
     }
 
-    static class DatapointListener {
+    static class CompatibilityListener {
 
         private final CountDownLatch received = new CountDownLatch(1);
         private volatile Datapoint datapoint;
 
-        @RabbitListener(queues = RabbitTopology.DATAPOINT_QUEUE)
+        @RabbitListener(id = "compatibilityTypePrecedenceListener", queues = COMPATIBILITY_QUEUE)
         public void receive(Datapoint datapoint) {
             this.datapoint = datapoint;
             received.countDown();
