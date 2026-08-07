@@ -1,4 +1,6 @@
 package com.emikaelsilveira.anomalydetector.consumer.messaging;
+import java.util.Objects;
+
 
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.ImmediateAcknowledgeAmqpException;
@@ -12,8 +14,14 @@ import org.springframework.amqp.rabbit.retry.RepublishMessageRecovererWithConfir
 public final class AcknowledgingRepublishMessageRecoverer implements MessageRecoverer {
 
     private final RepublishMessageRecovererWithConfirms confirmedRecoverer;
+    private final FatalMessageErrorHandler fatalMessageErrorHandler;
 
-    public AcknowledgingRepublishMessageRecoverer(RabbitTemplate rabbitTemplate) {
+
+    public AcknowledgingRepublishMessageRecoverer(
+            RabbitTemplate rabbitTemplate,
+            FatalMessageErrorHandler fatalMessageErrorHandler
+    ) {
+        this.fatalMessageErrorHandler = Objects.requireNonNull(fatalMessageErrorHandler, "fatalMessageErrorHandler");
         confirmedRecoverer = new RepublishMessageRecovererWithConfirms(
                 rabbitTemplate,
                 RabbitTopology.METRICS_DLX,
@@ -25,6 +33,9 @@ public final class AcknowledgingRepublishMessageRecoverer implements MessageReco
 
     @Override
     public void recover(Message message, Throwable cause) {
+        if (fatalMessageErrorHandler.recordConversionFailure(cause)) {
+            throw new AmqpRejectAndDontRequeueException("Fatal message conversion failed", true, cause);
+        }
         try {
             confirmedRecoverer.recover(message, cause);
         } catch (RuntimeException republishFailure) {

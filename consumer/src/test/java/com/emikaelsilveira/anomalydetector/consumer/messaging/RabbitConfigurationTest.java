@@ -1,9 +1,13 @@
 package com.emikaelsilveira.anomalydetector.consumer.messaging;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.emikaelsilveira.anomalydetector.consumer.contract.Datapoint;
+import com.emikaelsilveira.anomalydetector.consumer.metrics.ConsumerMetrics;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.amqp.AmqpException;
@@ -23,6 +27,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.JacksonJavaTypeMapper;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConversionException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.backoff.ExponentialBackOff;
 
@@ -94,7 +99,8 @@ class RabbitConfigurationTest {
         SimpleRabbitListenerContainerFactory factory = configuration.rabbitListenerContainerFactory(
                 mock(ConnectionFactory.class),
                 configuration.jacksonJsonMessageConverter(),
-                new AcknowledgingRepublishMessageRecoverer(recoveryTemplate)
+                new AcknowledgingRepublishMessageRecoverer(recoveryTemplate, fatalMessageErrorHandler()),
+                fatalMessageErrorHandler()
         );
         AtomicInteger attempts = new AtomicInteger();
         ProxyFactory proxyFactory = new ProxyFactory(new AlwaysFailingHandler(attempts));
@@ -118,12 +124,43 @@ class RabbitConfigurationTest {
         assertThat(recoveryBackOff.getMaxAttempts()).isEqualTo(Long.MAX_VALUE);
     }
 
+    @Test
+    void installsTheMetricAwareFatalMessageErrorHandler() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        FatalMessageErrorHandler errorHandler = new FatalMessageErrorHandler(new ConsumerMetrics(
+                registry,
+                Clock.fixed(Instant.parse("2026-08-05T14:22:07.361Z"), ZoneOffset.UTC),
+                100,
+                50
+        ));
+
+        SimpleRabbitListenerContainerFactory factory = configuration.rabbitListenerContainerFactory(
+                mock(ConnectionFactory.class),
+                configuration.jacksonJsonMessageConverter(),
+                new AcknowledgingRepublishMessageRecoverer(confirmedRecoveryTemplate(), errorHandler),
+                errorHandler
+        );
+
+        assertThat(ReflectionTestUtils.getField(factory, "errorHandler")).isSameAs(errorHandler);
+        registry.close();
+    }
+
     private SimpleRabbitListenerContainerFactory factoryWithConfirmedRecovery() {
         return configuration.rabbitListenerContainerFactory(
                 mock(ConnectionFactory.class),
                 configuration.jacksonJsonMessageConverter(),
-                new AcknowledgingRepublishMessageRecoverer(confirmedRecoveryTemplate())
+                new AcknowledgingRepublishMessageRecoverer(confirmedRecoveryTemplate(), fatalMessageErrorHandler()),
+                fatalMessageErrorHandler()
         );
+    }
+
+    private FatalMessageErrorHandler fatalMessageErrorHandler() {
+        return new FatalMessageErrorHandler(new ConsumerMetrics(
+                new SimpleMeterRegistry(),
+                Clock.systemUTC(),
+                100,
+                50
+        ));
     }
 
     private RabbitTemplate confirmedRecoveryTemplate() {

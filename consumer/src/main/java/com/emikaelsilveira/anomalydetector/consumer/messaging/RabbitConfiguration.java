@@ -1,4 +1,6 @@
 package com.emikaelsilveira.anomalydetector.consumer.messaging;
+import java.time.Duration;
+
 
 import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.core.Binding;
@@ -10,7 +12,9 @@ import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.listener.ConditionalRejectingErrorHandler;
+import com.emikaelsilveira.anomalydetector.consumer.metrics.ConsumerMetrics;
+import com.emikaelsilveira.anomalydetector.consumer.processing.DatapointProcessor;
+import org.springframework.core.retry.RetryPolicy;
 import org.springframework.amqp.support.converter.DefaultJacksonJavaTypeMapper;
 import org.springframework.amqp.support.converter.JacksonJavaTypeMapper;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
@@ -44,15 +48,29 @@ public class RabbitConfiguration {
     }
 
     @Bean
-    AcknowledgingRepublishMessageRecoverer acknowledgingRepublishMessageRecoverer(RabbitTemplate rabbitTemplate) {
-        return new AcknowledgingRepublishMessageRecoverer(rabbitTemplate);
+    AcknowledgingRepublishMessageRecoverer acknowledgingRepublishMessageRecoverer(
+            RabbitTemplate rabbitTemplate,
+            FatalMessageErrorHandler errorHandler
+    ) {
+        return new AcknowledgingRepublishMessageRecoverer(rabbitTemplate, errorHandler);
+    }
+
+    @Bean
+    FatalMessageErrorHandler fatalMessageErrorHandler(ConsumerMetrics metrics) {
+        return new FatalMessageErrorHandler(metrics);
+    }
+
+    @Bean
+    DatapointListener datapointListener(DatapointProcessor processor, ConsumerMetrics metrics) {
+        return new DatapointListener(processor, metrics);
     }
 
     @Bean
     SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             ConnectionFactory connectionFactory,
             JacksonJsonMessageConverter converter,
-            AcknowledgingRepublishMessageRecoverer recoverer
+            AcknowledgingRepublishMessageRecoverer recoverer,
+            FatalMessageErrorHandler errorHandler
     ) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
@@ -64,10 +82,9 @@ public class RabbitConfiguration {
         factory.setDefaultRequeueRejected(false);
         factory.setEnforceImmediateAckForManual(true);
         factory.setContainerCustomizer(container -> container.setShutdownTimeout(SHUTDOWN_TIMEOUT_MILLIS));
-        factory.setErrorHandler(fatalConversionErrorHandler());
+        factory.setErrorHandler(errorHandler);
         factory.setAdviceChain(RetryInterceptorBuilder.stateless()
-                .maxRetries(2)
-                .backOffOptions(250L, 2.0d, 2_000L)
+                .retryPolicy(processingRetryPolicy())
                 .recoverer(recoverer)
                 .build());
         factory.setRecoveryBackOff(brokerRecoveryBackOff());
@@ -110,11 +127,16 @@ public class RabbitConfiguration {
         return BindingBuilder.bind(queue).to(exchange).with(RabbitTopology.DATAPOINT_DLQ);
     }
 
-    private ConditionalRejectingErrorHandler fatalConversionErrorHandler() {
-        ConditionalRejectingErrorHandler errorHandler = new ConditionalRejectingErrorHandler();
-        errorHandler.setRejectManual(true);
-        return errorHandler;
+    private RetryPolicy processingRetryPolicy() {
+        return RetryPolicy.builder()
+                .maxRetries(2)
+                .delay(Duration.ofMillis(250L))
+                .multiplier(2.0d)
+                .maxDelay(Duration.ofSeconds(2L))
+                .predicate(throwable -> !FatalMessageErrorHandler.isConversionFailure(throwable))
+                .build();
     }
+
 
     private ExponentialBackOff brokerRecoveryBackOff() {
         ExponentialBackOff backOff = new ExponentialBackOff(1_000L, 2.0d);

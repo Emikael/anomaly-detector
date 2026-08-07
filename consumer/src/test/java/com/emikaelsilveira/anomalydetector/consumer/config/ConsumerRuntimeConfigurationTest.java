@@ -3,6 +3,7 @@ package com.emikaelsilveira.anomalydetector.consumer.config;
 import com.emikaelsilveira.anomalydetector.consumer.ConsumerApplication;
 import com.emikaelsilveira.anomalydetector.consumer.detection.ZScoreDetector;
 import com.emikaelsilveira.anomalydetector.consumer.metrics.ConsumerMetrics;
+import com.emikaelsilveira.anomalydetector.consumer.messaging.DatapointListener;
 import com.emikaelsilveira.anomalydetector.consumer.processing.BoundedIdCache;
 import com.emikaelsilveira.anomalydetector.consumer.processing.DatapointProcessor;
 import com.emikaelsilveira.anomalydetector.consumer.processing.EventTimeMonitor;
@@ -52,6 +53,9 @@ class ConsumerRuntimeConfigurationTest {
 
     @Autowired
     private ConsumerMetrics consumerMetrics;
+    @Autowired
+    private DatapointListener datapointListener;
+
 
     @Test
     void wiresConfiguredDetectorCollaboratorsIntoTheProcessorRuntime() {
@@ -63,5 +67,6 @@ class ConsumerRuntimeConfigurationTest {
         assertThat(eventTimeMonitor).isNotNull();
         assertThat(datapointValidator).isNotNull();
         assertThat(consumerMetrics).isNotNull();
+        assertThat(datapointListener).isNotNull();
     }
 }
