@@ -1,21 +1,28 @@
 package com.emikaelsilveira.anomalydetector.consumer.messaging;
 
-import java.util.Objects;
-
 import com.emikaelsilveira.anomalydetector.consumer.metrics.ConsumerMetrics;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.listener.ConditionalRejectingErrorHandler;
 import org.springframework.amqp.support.converter.MessageConversionException;
 import org.springframework.util.ErrorHandler;
 
+@RequiredArgsConstructor
 public final class FatalMessageErrorHandler implements ErrorHandler {
 
-    private final ConsumerMetrics metrics;
-    private final ConditionalRejectingErrorHandler delegate = new ConditionalRejectingErrorHandler();
+    private final @NonNull ConsumerMetrics metrics;
+    private final ConditionalRejectingErrorHandler delegate = rejectingErrorHandler();
 
-    public FatalMessageErrorHandler(ConsumerMetrics metrics) {
-        this.metrics = Objects.requireNonNull(metrics, "metrics");
-        delegate.setRejectManual(true);
+    /**
+     * {@code rejectManual} is the whole point of delegating here: the container acknowledges
+     * manually, so without it a fatal conversion failure would be logged and then left unacked,
+     * stalling the queue behind an unredeliverable message.
+     */
+    private static ConditionalRejectingErrorHandler rejectingErrorHandler() {
+        ConditionalRejectingErrorHandler handler = new ConditionalRejectingErrorHandler();
+        handler.setRejectManual(true);
+        return handler;
     }
 
     @Override

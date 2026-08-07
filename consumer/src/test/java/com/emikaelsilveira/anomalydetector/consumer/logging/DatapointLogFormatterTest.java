@@ -41,7 +41,7 @@ class DatapointLogFormatterTest {
     void formatsTheDegenerateExceptionWithTheCapacityDenominator() {
         assertThat(formatter.format(datapoint(100.00d, Instant.parse("2026-08-05T14:21:51.002Z")),
                 result(DetectionStatus.DEGENERATE_WINDOW, OptionalDouble.empty(), 31, 30, 50)))
-                .isEqualTo("[2026-08-05T14:21:51.002Z] Data point: 100.00 | Status: DEGENERATE_WINDOW | Samples: 31/50");
+                .isEqualTo("[2026-08-05T14:21:51.002Z] Data point: 100.00 | Status: DEGENERATE_WINDOW | Window: 31/50");
     }
 
     @Test

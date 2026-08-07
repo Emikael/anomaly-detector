@@ -18,6 +18,18 @@ public record DetectorProperties(
         @Min(1) int summaryEvery
 ) {
 
+    /**
+     * How many windows' worth of message ids the duplicate cache keeps. Sized off the window rather
+     * than fixed, so it scales with the configured window; ten of them is enough to absorb a broker
+     * redelivery burst after a restart while staying bounded.
+     */
+    private static final int ID_CACHE_WINDOWS = 10;
+
+    /** Derived here rather than in the composition root, which owns no detector sizing decisions. */
+    public int idCacheCapacity() {
+        return ID_CACHE_WINDOWS * windowSize;
+    }
+
     @AssertTrue(message = "zThreshold must be finite")
     public boolean isZThresholdFinite() {
         return Double.isFinite(zThreshold);

@@ -17,30 +17,34 @@ class EventTimeMonitorTest {
     void exactlyFiveSecondsBehindDoesNotWarn() {
         EventTimeMonitor monitor = monitor();
 
-        assertThat(monitor.isDrifted(PROCESSING_TIME.minusSeconds(5))).isFalse();
+        assertThat(monitor.isExcessive(monitor.drift(PROCESSING_TIME.minusSeconds(5)))).isFalse();
     }
 
     @Test
     void exactlyFiveSecondsAheadDoesNotWarn() {
         EventTimeMonitor monitor = monitor();
 
-        assertThat(monitor.isDrifted(PROCESSING_TIME.plusSeconds(5))).isFalse();
+        assertThat(monitor.isExcessive(monitor.drift(PROCESSING_TIME.plusSeconds(5)))).isFalse();
     }
 
     @Test
     void moreThanFiveSecondsBehindWarnsWithAnAbsoluteDrift() {
         EventTimeMonitor monitor = monitor();
 
-        assertThat(monitor.isDrifted(PROCESSING_TIME.minusSeconds(6))).isTrue();
-        assertThat(monitor.drift(PROCESSING_TIME.minusSeconds(6))).isEqualTo(Duration.ofSeconds(6));
+        Duration drift = monitor.drift(PROCESSING_TIME.minusSeconds(6));
+
+        assertThat(drift).isEqualTo(Duration.ofSeconds(6));
+        assertThat(monitor.isExcessive(drift)).isTrue();
     }
 
     @Test
     void moreThanFiveSecondsAheadWarnsWithAnAbsoluteDrift() {
         EventTimeMonitor monitor = monitor();
 
-        assertThat(monitor.isDrifted(PROCESSING_TIME.plusSeconds(6))).isTrue();
-        assertThat(monitor.drift(PROCESSING_TIME.plusSeconds(6))).isEqualTo(Duration.ofSeconds(6));
+        Duration drift = monitor.drift(PROCESSING_TIME.plusSeconds(6));
+
+        assertThat(drift).isEqualTo(Duration.ofSeconds(6));
+        assertThat(monitor.isExcessive(drift)).isTrue();
     }
 
     private EventTimeMonitor monitor() {

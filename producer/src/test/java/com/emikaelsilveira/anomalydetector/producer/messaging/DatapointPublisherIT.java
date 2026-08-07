@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(
         classes = ProducerApplication.class,
-        properties = "spring.task.scheduling.enabled=false",
+        properties = "producer.scheduling-enabled=false",
         webEnvironment = SpringBootTest.WebEnvironment.NONE
 )
 @Testcontainers

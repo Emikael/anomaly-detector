@@ -3,6 +3,7 @@ package com.emikaelsilveira.anomalydetector.consumer.config;
 import java.time.Clock;
 
 import com.emikaelsilveira.anomalydetector.consumer.detection.ZScoreDetector;
+import com.emikaelsilveira.anomalydetector.consumer.logging.ConsoleEventLog;
 import com.emikaelsilveira.anomalydetector.consumer.logging.DatapointEventLogger;
 import com.emikaelsilveira.anomalydetector.consumer.logging.DatapointLogFormatter;
 import com.emikaelsilveira.anomalydetector.consumer.metrics.ConsumerMetrics;
@@ -37,7 +38,7 @@ public class ConsumerRuntimeConfiguration {
 
     @Bean
     BoundedIdCache boundedIdCache(DetectorProperties properties) {
-        return new BoundedIdCache(10 * properties.windowSize());
+        return new BoundedIdCache(properties.idCacheCapacity());
     }
 
     @Bean
@@ -62,7 +63,7 @@ public class ConsumerRuntimeConfiguration {
 
     @Bean
     DatapointEventLogger datapointEventLogger(DatapointLogFormatter formatter) {
-        return new DatapointEventLogger(LoggerFactory.getLogger(DatapointEventLogger.class), formatter);
+        return new DatapointEventLogger(LoggerFactory.getLogger(ConsoleEventLog.NAME), formatter);
     }
 
     @Bean

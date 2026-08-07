@@ -11,6 +11,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.emikaelsilveira.anomalydetector.consumer.detection.DetectionResult;
 import com.emikaelsilveira.anomalydetector.consumer.detection.DetectionStatus;
+import com.emikaelsilveira.anomalydetector.consumer.logging.ConsoleEventLog;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,7 @@ class ConsumerMetricsTest {
     @BeforeEach
     void setUp() {
         registry = new SimpleMeterRegistry();
-        logger = (Logger) LoggerFactory.getLogger("com.emikaelsilveira.anomalydetector.consumer.metrics.ConsumerMetrics");
+        logger = (Logger) LoggerFactory.getLogger(ConsoleEventLog.NAME);
         appender = new ListAppender<>();
         appender.start();
         logger.addAppender(appender);

@@ -1,36 +1,39 @@
 package com.emikaelsilveira.anomalydetector.producer.messaging;
 
 import java.time.Duration;
+import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.emikaelsilveira.anomalydetector.producer.contract.Datapoint;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpConnectException;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.DirectExchange;
-import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.DefaultJacksonJavaTypeMapper;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
+@Slf4j
 @Configuration(proxyBeanMethods = false)
 public class RabbitConfiguration {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(RabbitConfiguration.class);
+    /**
+     * Logical wire type id, matching {@code contracts/datapoint.v1.schema.json}. The converter always
+     * stamps a {@code __TypeId__} header; without an explicit mapping it would be the producer's
+     * fully-qualified class name, putting an internal package on the wire and contradicting AD-05,
+     * which makes the schema — not a shared Java class — the contract.
+     */
+    static final String DATAPOINT_TYPE_ID = "datapoint.v1";
 
     @Bean
     JacksonJsonMessageConverter jacksonJsonMessageConverter() {
         JacksonJsonMessageConverter converter = new JacksonJsonMessageConverter(
                 JsonMapper.builder().findAndAddModules().build());
         DefaultJacksonJavaTypeMapper typeMapper = new DefaultJacksonJavaTypeMapper();
-        typeMapper.setTrustedPackages("com.emikaelsilveira.anomalydetector.producer.contract");
+        typeMapper.setIdClassMapping(Map.of(DATAPOINT_TYPE_ID, Datapoint.class));
         converter.setJavaTypeMapper(typeMapper);
         return converter;
     }
@@ -72,41 +75,5 @@ public class RabbitConfiguration {
                 returned.getRoutingKey()
         ));
         return template;
-    }
-
-    @Bean
-    DirectExchange metricsExchange() {
-        return new DirectExchange(RabbitTopology.METRICS_EXCHANGE, true, false);
-    }
-
-    @Bean
-    DirectExchange metricsDlx() {
-        return new DirectExchange(RabbitTopology.METRICS_DLX, true, false);
-    }
-
-    @Bean
-    Queue datapointQueue() {
-        return new Queue(RabbitTopology.DATAPOINT_QUEUE, true, false, false, RabbitTopology.mainQueueArguments());
-    }
-
-    @Bean
-    Queue datapointDlq() {
-        return new Queue(RabbitTopology.DATAPOINT_DLQ, true);
-    }
-
-    @Bean
-    Binding datapointBinding(
-            @Qualifier("datapointQueue") Queue queue,
-            @Qualifier("metricsExchange") DirectExchange exchange
-    ) {
-        return BindingBuilder.bind(queue).to(exchange).with(RabbitTopology.METRICS_ROUTING_KEY);
-    }
-
-    @Bean
-    Binding datapointDlqBinding(
-            @Qualifier("datapointDlq") Queue queue,
-            @Qualifier("metricsDlx") DirectExchange exchange
-    ) {
-        return BindingBuilder.bind(queue).to(exchange).with(RabbitTopology.DATAPOINT_DLQ);
     }
 }

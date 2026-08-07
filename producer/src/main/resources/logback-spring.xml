@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The producer's injection and level-shift lines are the reviewer's ground truth for correlating
+  against consumer verdicts, so they own stdout verbatim through a dedicated appender.
+
+  Everything else keeps Spring Boot's standard pattern. Forcing "%msg%n" globally would strip the
+  level from every WARN and ERROR — including publisher nacks and unroutable returns, which are the
+  whole point of enabling confirms and returns in the first place.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- "!json", not "plain": LOG_FORMAT feeds spring.profiles.active directly, so an unrecognised
+         value would otherwise match neither block, leave the context with no appenders, and make the
+         app die without printing the very validation error that explains why. -->
+    <springProfile name="!json">
+        <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+        <appender name="EVENT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%msg%n</pattern>
+                <charset>${CONSOLE_LOG_CHARSET}</charset>
+            </encoder>
+        </appender>
+
+        <!-- Bound by class, unlike the consumer's copy, which routes a logger name. This class
+             exists only to emit the mandated lines and is the sole writer to stdout here, so there
+             is no second concern to separate; the consumer needed a name because its metrics class
+             shares the appender and must keep the standard pattern for anything else it logs. -->
+        <logger name="com.emikaelsilveira.anomalydetector.producer.logging.ProducerEventLogger"
+                additivity="false">
+            <appender-ref ref="EVENT"/>
+        </logger>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Structured output goes to an aggregator, where a bespoke plain-text line has no value. -->
+    <springProfile name="json">
+        <include resource="org/springframework/boot/logging/logback/structured-console-appender.xml"/>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+</configuration>

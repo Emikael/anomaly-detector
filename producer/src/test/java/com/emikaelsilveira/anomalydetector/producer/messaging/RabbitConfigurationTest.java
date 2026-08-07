@@ -7,11 +7,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.emikaelsilveira.anomalydetector.producer.contract.Datapoint;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.AmqpConnectException;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
-import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
@@ -31,25 +28,6 @@ class RabbitConfigurationTest {
     private final RabbitConfiguration configuration = new RabbitConfiguration();
 
     @Test
-    void declaresDurableExchangesQueuesAndBindings() {
-        DirectExchange metricsExchange = configuration.metricsExchange();
-        DirectExchange metricsDlx = configuration.metricsDlx();
-        Queue datapointQueue = configuration.datapointQueue();
-        Queue datapointDlq = configuration.datapointDlq();
-        Binding datapointBinding = configuration.datapointBinding(datapointQueue, metricsExchange);
-        Binding dlqBinding = configuration.datapointDlqBinding(datapointDlq, metricsDlx);
-
-        assertThat(metricsExchange.isDurable()).isTrue();
-        assertThat(metricsExchange.isAutoDelete()).isFalse();
-        assertThat(metricsDlx.isDurable()).isTrue();
-        assertThat(datapointQueue.isDurable()).isTrue();
-        assertThat(datapointQueue.getArguments()).isEqualTo(RabbitTopology.mainQueueArguments());
-        assertThat(datapointDlq.isDurable()).isTrue();
-        assertThat(datapointBinding.getRoutingKey()).isEqualTo(RabbitTopology.METRICS_ROUTING_KEY);
-        assertThat(dlqBinding.getRoutingKey()).isEqualTo(RabbitTopology.DATAPOINT_DLQ);
-    }
-
-    @Test
     void configuresJacksonThreeJsonConversion() {
         JacksonJsonMessageConverter converter = configuration.jacksonJsonMessageConverter();
         Datapoint datapoint = new Datapoint(
@@ -64,6 +42,28 @@ class RabbitConfigurationTest {
 
         assertThat(message.getMessageProperties().getContentType()).isEqualTo(MessageProperties.CONTENT_TYPE_JSON);
         assertThat(converter.fromMessage(message)).isEqualTo(datapoint);
+    }
+
+    @Test
+    void stampsALogicalTypeIdRatherThanTheProducerClassName() {
+        JacksonJsonMessageConverter converter = configuration.jacksonJsonMessageConverter();
+
+        Message message = converter.toMessage(datapoint(), new MessageProperties());
+
+        Object typeId = message.getMessageProperties().getHeaders().get("__TypeId__");
+        assertThat(typeId).isEqualTo(RabbitConfiguration.DATAPOINT_TYPE_ID);
+        // AD-05: the schema is the contract, so no producer package may travel on the wire.
+        assertThat(String.valueOf(typeId)).doesNotContain("com.emikaelsilveira");
+    }
+
+    private Datapoint datapoint() {
+        return new Datapoint(
+                java.util.UUID.fromString("0f3a9c1e-6b7d-4a2f-9c11-8de4b5a70c93"),
+                1041,
+                "sensor.temperature",
+                100.4213,
+                Instant.parse("2026-08-05T14:22:07.361Z")
+        );
     }
 
     @Test

@@ -13,6 +13,9 @@ compose() {
   docker compose "$@"
 }
 
+# A `readonly`/`local` assignment masks the exit status of its command substitution, so `set -e`
+# cannot catch a missing key here. Resolve into a plain variable and check explicitly, otherwise a
+# typo'd key silently yields an empty port and a 120s timeout against http://localhost:/actuator/...
 dotenv_value() {
   local key=$1
   local name
@@ -28,8 +31,23 @@ dotenv_value() {
   return 1
 }
 
-readonly CONSUMER_HTTP_PORT="${CONSUMER_HTTP_PORT:-$(dotenv_value CONSUMER_HTTP_PORT)}"
-readonly PRODUCER_HTTP_PORT="${PRODUCER_HTTP_PORT:-$(dotenv_value PRODUCER_HTTP_PORT)}"
+require_port() {
+  local key=$1
+  local value="${!key:-}"
+
+  if [[ -z $value ]]; then
+    if ! value="$(dotenv_value "$key")" || [[ -z $value ]]; then
+      printf 'Missing %s: set it in the environment or in .env.\n' "$key" >&2
+      exit 1
+    fi
+  fi
+  printf '%s' "$value"
+}
+
+CONSUMER_HTTP_PORT="$(require_port CONSUMER_HTTP_PORT)"
+PRODUCER_HTTP_PORT="$(require_port PRODUCER_HTTP_PORT)"
+readonly CONSUMER_HTTP_PORT
+readonly PRODUCER_HTTP_PORT
 readonly CONSUMER_READINESS_URL="http://localhost:${CONSUMER_HTTP_PORT}/actuator/health/readiness"
 readonly PRODUCER_READINESS_URL="http://localhost:${PRODUCER_HTTP_PORT}/actuator/health/readiness"
 readonly CONSUMER_PROMETHEUS_URL="http://localhost:${CONSUMER_HTTP_PORT}/actuator/prometheus"
@@ -194,6 +212,51 @@ assert_memory_limit() {
     "$service" "$usage" "$percentage" "$MEMORY_PERCENT_LIMIT"
 }
 
+# Replays the exact walkthrough printed in README section 4 against the real three-container system.
+# The seeded stream depends only on the RNG draw order, never on wall-clock pacing, so a 25 ms interval
+# reproduces the documented sequences ten times faster than the 250 ms default.
+assert_documented_shift_trace() {
+  local deadline
+  local logs
+  local line
+  local expected=(
+    'LEVEL SHIFT at seq=400: mean 100.00 -> 150.00'
+    'Data point: 148.37 | Status: ANOMALY DETECTED! | Z-score: 10.84'
+    'Data point: 90.35 | Status: OK | Z-score: 1.95'
+    'Data point: 145.69 | Status: ANOMALY DETECTED! | Z-score: 9.92'
+    'Data point: 140.24 | Status: ANOMALY DETECTED! | Z-score: 8.76'
+    'Data point: 155.24 | Status: ANOMALY DETECTED! | Z-score: 11.96'
+    'Data point: 152.26 | Status: ANOMALY DETECTED! | Z-score: 11.32'
+    'Data point: 155.78 | Status: ANOMALY DETECTED! | Z-score: 12.07'
+    'Data point: 146.39 | Status: OK | Z-score: 2.61'
+  )
+
+  printf 'Restarting with the regime-shift demo enabled.\n'
+  compose down -v
+  PRODUCER_LEVEL_SHIFT_ENABLED=true PRODUCER_INTERVAL_MS=25 docker compose up --build --detach
+  wait_for_readiness consumer "$CONSUMER_READINESS_URL"
+
+  deadline=$((SECONDS + OBSERVATION_TIMEOUT_SECONDS))
+  while (( SECONDS < deadline )); do
+    logs="$(compose logs --no-color --no-log-prefix --tail=3000)"
+    if [[ $logs == *"${expected[${#expected[@]} - 1]}"* ]]; then
+      for line in "${expected[@]}"; do
+        if [[ $logs != *"$line"* ]]; then
+          printf 'Regime-shift trace diverged from README section 4; missing: %s\n' "$line" >&2
+          return 1
+        fi
+      done
+      printf 'Regime-shift trace matches README section 4 through the K=5 admission at seq 407.\n'
+      return 0
+    fi
+    sleep 2
+  done
+
+  printf 'Timed out after %ss waiting for the documented regime-shift trace.\n' \
+    "$OBSERVATION_TIMEOUT_SECONDS" >&2
+  return 1
+}
+
 printf 'Starting a clean Compose smoke environment.\n'
 compose down -v
 compose up --build --detach
@@ -205,5 +268,6 @@ assert_prometheus_metrics
 assert_forbidden_endpoint
 assert_memory_limit consumer
 assert_memory_limit producer
+assert_documented_shift_trace
 
 printf 'Smoke test passed; tearing down Compose resources.\n'

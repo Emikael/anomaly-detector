@@ -71,9 +71,10 @@ class DatapointListenerIT {
     @MockitoSpyBean
     private DatapointProcessor processor;
 
-
     private Logger processorLogger;
     private ListAppender<ILoggingEvent> processorAppender;
+    private Logger listenerLogger;
+    private ListAppender<ILoggingEvent> listenerAppender;
 
     @DynamicPropertySource
     static void rabbitProperties(DynamicPropertyRegistry registry) {
@@ -95,16 +96,23 @@ class DatapointListenerIT {
         processorAppender = new ListAppender<>();
         processorAppender.start();
         processorLogger.addAppender(processorAppender);
+        // The rejection is logged by the listener, which owns the ack decision, not by the processor.
+        listenerLogger = (Logger) org.slf4j.LoggerFactory.getLogger(DatapointListener.class);
+        listenerAppender = new ListAppender<>();
+        listenerAppender.start();
+        listenerLogger.addAppender(listenerAppender);
         listenerRegistry.start();
     }
 
     @AfterEach
-
     void stopCapturingWarnings() {
         stopListeners();
         processorLogger.detachAppender(processorAppender);
         processorAppender.stop();
+        listenerLogger.detachAppender(listenerAppender);
+        listenerAppender.stop();
     }
+
 
     @Test
     void acknowledgesAHappyDeliveryAfterItIsProcessed() {
@@ -116,6 +124,7 @@ class DatapointListenerIT {
         assertThat(queueDepth(RabbitTopology.DATAPOINT_DLQ)).isZero();
     }
 
+
     @Test
     void deadLettersMalformedJsonExactlyOnce() {
         sendRaw("{not-json");
@@ -126,6 +135,7 @@ class DatapointListenerIT {
         assertThat(rabbitTemplate.receive(RabbitTopology.DATAPOINT_DLQ, 1_000)).isNull();
         assertThat(rejectedCount()).isEqualTo(1.0d);
     }
+
 
     @Test
     void deadLettersMissingRequiredCreatorValuesExactlyOnce() {
@@ -140,6 +150,7 @@ class DatapointListenerIT {
         assertThat(rejectedCount()).isEqualTo(1.0d);
     }
 
+
     @Test
     void deadLettersNanInfinityAndOutOfRangeValues() {
         sendRaw(datapointJson(UUID.randomUUID(), 1L, "NaN"));
@@ -150,7 +161,15 @@ class DatapointListenerIT {
         assertThat(receiveEventually(RabbitTopology.DATAPOINT_DLQ)).isNotNull();
         assertThat(receiveEventually(RabbitTopology.DATAPOINT_DLQ)).isNotNull();
         assertThat(rejectedCount()).isEqualTo(3.0d);
+        // Only the 1e151 send is guaranteed to reach the validator; NaN and Infinity may be
+        // rejected earlier as conversion failures, which increment the same counter. Dead-lettering
+        // is terminal, so the offending field has to be named in the log, not just counted.
+        await(() -> listenerMessages().stream().anyMatch(message ->
+                message.contains("Dead-lettering invalid datapoint")
+                        && message.contains("field=value")
+                        && message.contains("sequence=3")));
     }
+
 
     @Test
     void acknowledgesDuplicateDeliveriesWithoutSecondDetection() {
@@ -163,6 +182,7 @@ class DatapointListenerIT {
         verify(processor, timeout(TimeUnit.SECONDS.toMillis(WAIT_SECONDS)).times(2)).process(datapoint);
         assertThat(queueDepth(RabbitTopology.DATAPOINT_QUEUE)).isZero();
     }
+
 
     @Test
     void processesGapAndOutOfOrderSequencesInArrivalOrder() {
@@ -181,6 +201,7 @@ class DatapointListenerIT {
                 && processorMessages().stream()
                 .anyMatch(message -> message.contains("expected=4") && message.contains("actual=2")));
     }
+
     @Test
     void retriesThreeTimesThenRepublishesOnePersistentConfirmedDeadLetterAndFreesPrefetch() {
         Datapoint failing = datapoint(1L, 0.0d);
@@ -202,6 +223,7 @@ class DatapointListenerIT {
         assertThat(queueDepth(RabbitTopology.DATAPOINT_QUEUE)).isZero();
     }
 
+
     @Test
     void remembersBeforeRetrySoAnAlreadyProcessedRedeliveryIsDeduplicated() {
         Datapoint datapoint = datapoint(1L, 0.0d);
@@ -221,6 +243,7 @@ class DatapointListenerIT {
         assertThat(queueDepth(RabbitTopology.DATAPOINT_QUEUE)).isZero();
     }
 
+
     @Test
     void retainsMessagesForALateConsumerAndProcessesThemWhenItStarts() {
         stopListeners();
@@ -231,6 +254,7 @@ class DatapointListenerIT {
         listenerRegistry.start();
         await(() -> processedCount() == 1.0d);
     }
+
     @Test
     void recoversTheListenerAfterRabbitBrokerRestart() throws Exception {
         assertThat(RABBIT.execInContainer("rabbitmqctl", "stop_app").getExitCode()).isZero();
@@ -241,6 +265,7 @@ class DatapointListenerIT {
         sendEventually(datapoint);
         await(() -> processedCount() == 1.0d);
     }
+
 
     @Test
     void stopsTheListenerGracefullyWithoutLeavingAnUnackedMessage() {
@@ -266,7 +291,6 @@ class DatapointListenerIT {
             }
         });
     }
-
 
     private void sendRaw(String body) {
         MessageProperties properties = new MessageProperties();
@@ -308,6 +332,10 @@ class DatapointListenerIT {
         return processorAppender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
     }
 
+    private List<String> listenerMessages() {
+        return listenerAppender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+    }
+
     private void stopListeners() {
         listenerRegistry.getListenerContainers().forEach(container -> container.stop());
         await(() -> listenerRegistry.getListenerContainers().stream().noneMatch(container -> container.isRunning()));
@@ -328,7 +356,6 @@ class DatapointListenerIT {
         }
         assertThat(condition.getAsBoolean()).isTrue();
     }
-
 
     private Datapoint datapoint(long sequence, double value) {
         return new Datapoint(UUID.randomUUID(), sequence, "sensor.temperature", value, EMITTED_AT);

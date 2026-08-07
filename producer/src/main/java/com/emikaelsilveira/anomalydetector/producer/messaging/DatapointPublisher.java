@@ -1,43 +1,35 @@
 package com.emikaelsilveira.anomalydetector.producer.messaging;
 
-import java.util.Objects;
-
 import com.emikaelsilveira.anomalydetector.producer.contract.Datapoint;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.amqp.AmqpException;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+@RequiredArgsConstructor
 public final class DatapointPublisher {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(DatapointPublisher.class);
+    private final @NonNull RabbitTemplate rabbitTemplate;
 
-    private final RabbitTemplate rabbitTemplate;
-
-    public DatapointPublisher(RabbitTemplate rabbitTemplate) {
-        this.rabbitTemplate = Objects.requireNonNull(rabbitTemplate, "rabbitTemplate");
-    }
-
-    public void publish(Datapoint datapoint) {
-        Objects.requireNonNull(datapoint, "datapoint");
+    /**
+     * Publishes persistently with the datapoint id as both message id and confirm correlation.
+     *
+     * <p>Failures propagate untouched: the caller owns the decision about a lost tick, and logging
+     * here as well would emit the same stack trace twice per failed publish.
+     */
+    public void publish(@NonNull Datapoint datapoint) {
         String id = datapoint.id().toString();
-        try {
-            rabbitTemplate.convertAndSend(
-                    RabbitTopology.METRICS_EXCHANGE,
-                    RabbitTopology.METRICS_ROUTING_KEY,
-                    datapoint,
-                    message -> {
-                        message.getMessageProperties().setMessageId(id);
-                        message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-                        return message;
-                    },
-                    new CorrelationData(id)
-            );
-        } catch (AmqpException exception) {
-            LOGGER.error("Unable to publish datapoint id={} sequence={}", id, datapoint.sequence(), exception);
-            throw exception;
-        }
+        rabbitTemplate.convertAndSend(
+                RabbitTopology.METRICS_EXCHANGE,
+                RabbitTopology.METRICS_ROUTING_KEY,
+                datapoint,
+                message -> {
+                    message.getMessageProperties().setMessageId(id);
+                    message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+                    return message;
+                },
+                new CorrelationData(id)
+        );
     }
 }

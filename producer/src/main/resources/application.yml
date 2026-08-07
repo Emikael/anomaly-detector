@@ -16,6 +16,7 @@ spring:
 
 
 producer:
+  scheduling-enabled: ${PRODUCER_SCHEDULING_ENABLED:true}
   interval-ms: ${PRODUCER_INTERVAL_MS:250}
   mean: ${PRODUCER_MEAN:100.0}
   stddev: ${PRODUCER_STDDEV:5.0}

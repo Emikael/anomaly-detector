@@ -66,7 +66,7 @@ class ProducerRuntimeConfigurationTest {
     void createsTheProductionServiceByDefaultAndOmitsItWhenSchedulingIsDisabled() {
         runtimeContextRunner.run(context ->
                 assertThat(context).hasSingleBean(com.emikaelsilveira.anomalydetector.producer.production.DatapointProductionService.class));
-        runtimeContextRunner.withPropertyValues("spring.task.scheduling.enabled=false").run(context ->
+        runtimeContextRunner.withPropertyValues("producer.scheduling-enabled=false").run(context ->
                 assertThat(context).doesNotHaveBean(com.emikaelsilveira.anomalydetector.producer.production.DatapointProductionService.class));
     }
 

@@ -1,4 +1,4 @@
-package com.emikaelsilveira.anomalydetector.consumer.logging;
+package com.emikaelsilveira.anomalydetector.consumer.config;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

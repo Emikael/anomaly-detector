@@ -44,15 +44,17 @@ public final class DatapointLogFormatter {
                     "[%s] Data point: %.2f | Status: WARMING_UP | Samples: %d/%d",
                     emittedAt,
                     value,
-                    result.samples(),
+                    result.referenceSamples(),
                     result.minSamples()
             );
+            // The brief does not define this line. "Window" rather than "Samples" because the
+            // denominator here is capacity, not the warm-up floor used above.
             case DEGENERATE_WINDOW -> String.format(
                     Locale.ROOT,
-                    "[%s] Data point: %.2f | Status: DEGENERATE_WINDOW | Samples: %d/%d",
+                    "[%s] Data point: %.2f | Status: DEGENERATE_WINDOW | Window: %d/%d",
                     emittedAt,
                     value,
-                    result.samples(),
+                    result.referenceSamples(),
                     result.capacity()
             );
         };

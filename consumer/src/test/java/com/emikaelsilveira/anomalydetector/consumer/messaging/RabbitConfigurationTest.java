@@ -13,11 +13,8 @@ import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.ImmediateAcknowledgeAmqpException;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
-import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.config.ContainerCustomizer;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
@@ -43,26 +40,6 @@ class RabbitConfigurationTest {
     private final RabbitConfiguration configuration = new RabbitConfiguration();
 
     @Test
-    void declaresTheSameDurableTopologyAsTheProducer() {
-        DirectExchange metricsExchange = configuration.metricsExchange();
-        DirectExchange metricsDlx = configuration.metricsDlx();
-        Queue datapointQueue = configuration.datapointQueue();
-        Queue datapointDlq = configuration.datapointDlq();
-        Binding datapointBinding = configuration.datapointBinding(datapointQueue, metricsExchange);
-        Binding dlqBinding = configuration.datapointDlqBinding(datapointDlq, metricsDlx);
-
-        assertThat(metricsExchange.isDurable()).isTrue();
-        assertThat(metricsExchange.isAutoDelete()).isFalse();
-        assertThat(metricsDlx.isDurable()).isTrue();
-        assertThat(metricsDlx.isAutoDelete()).isFalse();
-        assertThat(datapointQueue.isDurable()).isTrue();
-        assertThat(datapointQueue.getArguments()).isEqualTo(RabbitTopology.mainQueueArguments());
-        assertThat(datapointDlq.isDurable()).isTrue();
-        assertThat(datapointBinding.getRoutingKey()).isEqualTo(RabbitTopology.METRICS_ROUTING_KEY);
-        assertThat(dlqBinding.getRoutingKey()).isEqualTo(RabbitTopology.DATAPOINT_DLQ);
-    }
-
-    @Test
     void configuresStrictInferredJacksonThreeConversion() {
         JacksonJsonMessageConverter converter = configuration.jacksonJsonMessageConverter();
         assertThat(converter.fromMessage(datapointMessage("""
@@ -77,7 +54,7 @@ class RabbitConfigurationTest {
     }
 
     @Test
-    void configuresOneManualAckListenerWithSinglePrefetchAndThirtySecondDrain() {
+    void configuresOneManualAckListenerWithSinglePrefetchAndABoundedDrain() {
         SimpleRabbitListenerContainerFactory factory = factoryWithConfirmedRecovery();
 
         assertThat(ReflectionTestUtils.getField(factory, "acknowledgeMode")).isEqualTo(AcknowledgeMode.MANUAL);
@@ -90,7 +67,8 @@ class RabbitConfigurationTest {
                 (ContainerCustomizer<SimpleMessageListenerContainer>) ReflectionTestUtils.getField(factory, "containerCustomizer");
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         customizer.configure(container);
-        assertThat(ReflectionTestUtils.getField(container, "shutdownTimeout")).isEqualTo(30_000L);
+        // Strictly under the compose stop_grace_period of 30s so the drain cannot be SIGKILLed midway.
+        assertThat(ReflectionTestUtils.getField(container, "shutdownTimeout")).isEqualTo(20_000L);
     }
 
     @Test

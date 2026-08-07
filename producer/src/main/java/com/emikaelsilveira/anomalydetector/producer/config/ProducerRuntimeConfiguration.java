@@ -10,8 +10,8 @@ import com.emikaelsilveira.anomalydetector.producer.logging.ProducerEventLogger;
 import com.emikaelsilveira.anomalydetector.producer.messaging.DatapointPublisher;
 import com.emikaelsilveira.anomalydetector.producer.production.DatapointProductionService;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -40,19 +40,7 @@ public class ProducerRuntimeConfiguration {
             Supplier<UUID> idSupplier,
             ProducerProperties properties
     ) {
-        return new DatapointGenerator(
-                random,
-                clock,
-                idSupplier,
-                properties.mean(),
-                properties.stddev(),
-                properties.anomalyProbability(),
-                properties.anomalySigmaMin(),
-                properties.anomalySigmaMax(),
-                properties.levelShiftEnabled(),
-                properties.levelShiftAtSequence(),
-                properties.levelShiftSigma()
-        );
+        return new DatapointGenerator(random, clock, idSupplier, properties.generationProfile());
     }
 
     @Bean
@@ -65,9 +53,14 @@ public class ProducerRuntimeConfiguration {
         return new DatapointPublisher(rabbitTemplate);
     }
 
+    /**
+     * Own namespace, not {@code spring.task.scheduling.*}. Spring Boot defines no {@code enabled} key
+     * there, so squatting on the framework's prefix would hide a private switch behind a name that
+     * looks like a documented one.
+     */
     @Bean
     @ConditionalOnProperty(
-            name = "spring.task.scheduling.enabled",
+            name = "producer.scheduling-enabled",
             havingValue = "true",
             matchIfMissing = true
     )

@@ -11,6 +11,9 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 import com.emikaelsilveira.anomalydetector.producer.contract.Datapoint;
+import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile.AnomalyProfile;
+import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile.LevelShiftProfile;
+import lombok.NonNull;
 
 public final class DatapointGenerator {
 
@@ -19,50 +22,36 @@ public final class DatapointGenerator {
     private final Random random;
     private final Clock clock;
     private final Supplier<UUID> idSupplier;
-    private final double stddev;
-    private final double anomalyProbability;
-    private final double anomalySigmaMin;
-    private final double anomalySigmaMax;
-    private final boolean levelShiftEnabled;
-    private final long levelShiftAtSequence;
-    private final double levelShiftSigma;
+    private final GenerationProfile profile;
+
     private double currentMean;
     private long sequence;
 
     public DatapointGenerator(
-            Random random,
-            Clock clock,
-            Supplier<UUID> idSupplier,
-            double mean,
-            double stddev,
-            double anomalyProbability,
-            double anomalySigmaMin,
-            double anomalySigmaMax,
-            boolean levelShiftEnabled,
-            long levelShiftAtSequence,
-            double levelShiftSigma
+            @NonNull Random random,
+            @NonNull Clock clock,
+            @NonNull Supplier<UUID> idSupplier,
+            @NonNull GenerationProfile profile
     ) {
-        this.random = Objects.requireNonNull(random, "random");
-        this.clock = Objects.requireNonNull(clock, "clock");
-        this.idSupplier = Objects.requireNonNull(idSupplier, "idSupplier");
-        this.currentMean = mean;
-        this.stddev = stddev;
-        this.anomalyProbability = anomalyProbability;
-        this.anomalySigmaMin = anomalySigmaMin;
-        this.anomalySigmaMax = anomalySigmaMax;
-        this.levelShiftEnabled = levelShiftEnabled;
-        this.levelShiftAtSequence = levelShiftAtSequence;
-        this.levelShiftSigma = levelShiftSigma;
+        this.random = random;
+        this.clock = clock;
+        this.idSupplier = idSupplier;
+        this.profile = profile;
+        this.currentMean = profile.noise().mean();
     }
 
     public GeneratedDatapoint next() {
         long nextSequence = ++sequence;
         double meanBeforeShift = currentMean;
-        double value = meanBeforeShift + random.nextGaussian() * stddev;
+        double stddev = profile.noise().stddev();
+        // Drawn unconditionally, then discarded when an anomaly wins. The order of calls into
+        // `random` is part of this generator's contract: producer.seed promises a reproducible run,
+        // and sampling the Gaussian only on the baseline branch would shift every subsequent draw.
+        double baseline = meanBeforeShift + random.nextGaussian() * stddev;
         Optional<AnomalyInjection> anomalyInjection = anomalyInjection();
-        if (anomalyInjection.isPresent()) {
-            value = meanBeforeShift + anomalyInjection.orElseThrow().signedSigma() * stddev;
-        }
+        double value = anomalyInjection
+                .map(injection -> meanBeforeShift + injection.signedSigma() * stddev)
+                .orElse(baseline);
         Optional<LevelShift> levelShift = levelShift(nextSequence, meanBeforeShift);
         Instant emittedAt = clock.instant().truncatedTo(ChronoUnit.MILLIS);
         Datapoint datapoint = new Datapoint(
@@ -76,22 +65,24 @@ public final class DatapointGenerator {
     }
 
     private Optional<AnomalyInjection> anomalyInjection() {
-        if (random.nextDouble() >= anomalyProbability) {
+        AnomalyProfile anomaly = profile.anomaly();
+        if (random.nextDouble() >= anomaly.probability()) {
             return Optional.empty();
         }
-        double magnitude = anomalySigmaMin == anomalySigmaMax
-                ? anomalySigmaMin
-                : random.nextDouble(anomalySigmaMin, anomalySigmaMax);
+        double magnitude = anomaly.sigmaMin() == anomaly.sigmaMax()
+                ? anomaly.sigmaMin()
+                : random.nextDouble(anomaly.sigmaMin(), anomaly.sigmaMax());
         double signedSigma = random.nextBoolean() ? magnitude : -magnitude;
         return Optional.of(new AnomalyInjection(signedSigma));
     }
 
     private Optional<LevelShift> levelShift(long nextSequence, double meanBeforeShift) {
-        if (!levelShiftEnabled || nextSequence != levelShiftAtSequence) {
+        LevelShiftProfile levelShift = profile.levelShift();
+        if (!levelShift.enabled() || nextSequence != levelShift.atSequence()) {
             return Optional.empty();
         }
-        double newMean = meanBeforeShift + levelShiftSigma * stddev;
+        double newMean = meanBeforeShift + levelShift.sigma() * profile.noise().stddev();
         currentMean = newMean;
-        return Optional.of(new LevelShift(nextSequence, meanBeforeShift, newMean, levelShiftSigma));
+        return Optional.of(new LevelShift(nextSequence, meanBeforeShift, newMean, levelShift.sigma()));
     }
 }

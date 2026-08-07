@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.emikaelsilveira.anomalydetector.consumer.detection.DetectionResult;
 import com.emikaelsilveira.anomalydetector.consumer.detection.DetectionStatus;
+import com.emikaelsilveira.anomalydetector.consumer.logging.ConsoleEventLog;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Gauge;
@@ -30,7 +31,13 @@ public final class ConsumerMetrics {
     static final String Z_SCORE = "anomaly.detector.zscore";
     static final String PROCESSING = "anomaly.detector.processing";
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerMetrics.class);
+    /**
+     * Named, not {@code @Slf4j}: the summary is part of the verbatim console contract, and Lombok
+     * cannot express a logger name. Binding by name keeps any future diagnostic in this class on
+     * the standard pattern, with its level, logger and thread intact.
+     */
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConsoleEventLog.NAME);
+
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = new DateTimeFormatterBuilder()
             .appendInstant(3)
             .toFormatter();
@@ -68,7 +75,9 @@ public final class ConsumerMetrics {
         anomalies = Counter.builder(POINTS_ANOMALIES).register(requiredRegistry);
         rejected = Counter.builder(POINTS_REJECTED).register(requiredRegistry);
         duplicates = Counter.builder(POINTS_DUPLICATES).register(requiredRegistry);
-        Gauge.builder(WINDOW_OCCUPANCY, windowOccupancy, AtomicInteger::get).register(requiredRegistry);
+        Gauge.builder(WINDOW_OCCUPANCY, windowOccupancy, AtomicInteger::get)
+                .description("Reference window size the most recent verdict was scored against")
+                .register(requiredRegistry);
         zScores = DistributionSummary.builder(Z_SCORE).register(requiredRegistry);
         processing = Timer.builder(PROCESSING)
                 .publishPercentiles(0.99d)
@@ -80,7 +89,7 @@ public final class ConsumerMetrics {
         processing.record(Objects.requireNonNull(elapsed, "elapsed"));
         processed.increment();
         processedCount++;
-        windowOccupancy.set(requiredResult.samples());
+        windowOccupancy.set(requiredResult.referenceSamples());
         if (requiredResult.status() == DetectionStatus.ANOMALY) {
             anomalies.increment();
             anomalyCount++;

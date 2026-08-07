@@ -1,21 +1,21 @@
 package com.emikaelsilveira.anomalydetector.consumer.logging;
 
-import java.util.Objects;
-
 import com.emikaelsilveira.anomalydetector.consumer.contract.Datapoint;
 import com.emikaelsilveira.anomalydetector.consumer.detection.DetectionResult;
 import com.emikaelsilveira.anomalydetector.consumer.detection.DetectionStatus;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 
+/**
+ * Takes its {@link Logger} by injection rather than declaring a static one, so tests can assert on
+ * the character-exact verdict line R11 mandates without touching global logging state.
+ */
+@RequiredArgsConstructor
 public final class DatapointEventLogger {
 
-    private final Logger logger;
-    private final DatapointLogFormatter formatter;
-
-    public DatapointEventLogger(Logger logger, DatapointLogFormatter formatter) {
-        this.logger = Objects.requireNonNull(logger, "logger");
-        this.formatter = Objects.requireNonNull(formatter, "formatter");
-    }
+    private final @NonNull Logger logger;
+    private final @NonNull DatapointLogFormatter formatter;
 
     public void log(Datapoint datapoint, DetectionResult result) {
         var event = logger.atInfo()
@@ -26,7 +26,7 @@ public final class DatapointEventLogger {
                 .addKeyValue("value", formatter.normalizedZero(datapoint.value()))
                 .addKeyValue("status", result.status().name())
                 .addKeyValue("zScore", formatter.structuredZScore(result))
-                .addKeyValue("samples", result.samples())
+                .addKeyValue("referenceSamples", result.referenceSamples())
                 .addKeyValue("capacity", result.capacity());
         if (result.status() == DetectionStatus.ANOMALY) {
             event.addKeyValue("alert", DatapointLogFormatter.ALERT);

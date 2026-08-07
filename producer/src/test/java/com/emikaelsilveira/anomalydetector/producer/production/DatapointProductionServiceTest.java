@@ -45,6 +45,7 @@ class DatapointProductionServiceTest {
         verify(eventLogger).log(generated);
     }
 
+
     @Test
     void logsAndContainsATransientPublishFailureWithoutStoppingFutureTicks() {
         DatapointGenerator generator = mock(DatapointGenerator.class);
@@ -77,6 +78,7 @@ class DatapointProductionServiceTest {
             appender.stop();
         }
     }
+
 
     @Test
     void schedulesWithTheConfiguredFixedRate() throws Exception {

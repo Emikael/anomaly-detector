@@ -78,6 +78,21 @@ The consumer summary is a human-facing cumulative check: its anomaly percentage 
 
 RabbitMQ management is available at `http://localhost:15672` with the committed demo credentials `anomaly` / `anomaly`. Inspect `metrics.datapoint.q` for the main queue and `metrics.datapoint.dlq` for poison or exhausted messages. Those credentials are for the local demo only.
 
+### Console output
+
+Only the four verdict shapes and the producer's injection/level-shift lines are printed bare, because R11 fixes their format exactly:
+
+```text
+[<emittedAt>] Data point: 100.42 | Status: OK | Z-score: 0.31
+[<emittedAt>] Data point: 152.88 | Status: ANOMALY DETECTED! | Z-score: 9.84 | ALERT: Significant deviation detected.
+[<emittedAt>] Data point: 99.87 | Status: WARMING_UP | Samples: 12/30
+[<emittedAt>] Data point: 100.00 | Status: DEGENERATE_WINDOW | Window: 31/50
+```
+
+`WARMING_UP` counts toward the sample floor and `DEGENERATE_WINDOW` reports occupancy against capacity, so the two carry different labels rather than a single ambiguous `Samples:`. Both denominators describe the reference window the verdict was scored against, measured before the current point is considered for admission — the last warm-up line therefore reads `29/30`, not a self-contradictory `30/30`.
+
+Everything else — sequence gaps, event-time drift, dead-lettered payloads, duplicate deliveries, publisher nacks, unroutable returns, framework startup — keeps Spring Boot's standard pattern with level, logger and thread. A queue consumer whose WARN and ERROR lines are indistinguishable from its normal output is not operable, so the split is done with a dedicated Logback appender (`logback-spring.xml`) rather than by flattening the whole application to `%msg%n`. `LOG_FORMAT=json` sends everything, verdict lines included, to structured output instead.
+
 ## 4. Demo: regime shift
 
 Run the alternate demo without editing `.env`:
@@ -88,17 +103,27 @@ make demo-shift
 
 That shell-only override sets `PRODUCER_LEVEL_SHIFT_ENABLED=true`. Sequence 400 is generated against the old mean, then the producer emits one level-shift line and sequence 401 is the first observation at the new mean. At the default four messages per second, reaching sequence 400 takes about 100 seconds of producer time.
 
-Expected behavior:
+Observed behavior with the committed seed:
 
 ```text
 seq 400  *** LEVEL SHIFT at seq=400: mean 100.00 -> 150.00 (+10.0σ) ***
-seq 401  ANOMALY DETECTED!
-...
-seq 405  ANOMALY DETECTED!  # fifth consecutive anomaly is admitted after scoring
-seq 406+ window re-baselines; an OK verdict returns within the following 50 shifted points
+seq 401  value 148.37  ANOMALY DETECTED!  Z 10.84
+seq 402  value  90.35  OK                 Z  1.95   # a low injection, masked by the stale reference
+seq 403  value 145.69  ANOMALY DETECTED!  Z  9.92
+seq 404  value 140.24  ANOMALY DETECTED!  Z  8.76
+seq 405  value 155.24  ANOMALY DETECTED!  Z 11.96
+seq 406  value 152.26  ANOMALY DETECTED!  Z 11.32
+seq 407  value 155.78  ANOMALY DETECTED!  Z 12.07   # fifth *consecutive* anomaly: the run is admitted
+seq 408  value 146.39  OK                 Z  2.61   # reference has moved; verdicts normalise
 ```
 
-The fifth point remains an anomaly verdict. It is the admission event: the buffered run of five anomaly values is appended in arrival order so the rolling reference can adapt. This is a demonstrable mitigation, not a claim that raw Z-score solves change detection.
+Two things in that trace are worth pausing on.
+
+**Admission lands at 407, not 405.** The escape hatch counts *consecutive* anomalies, and sequence 402 breaks the first run. That point is itself an injected anomaly — a `-11.9σ` draw which, now that the mean has stepped to 150, lands at 90.35, almost exactly on the pre-shift baseline the detector is still scoring against. It is a genuine miss, and it is the honest illustration of why a stale reference is dangerous during a regime change: the detector cannot tell "anomalous" from "normal for the old world". A run interrupted this way is discarded, so the counter restarts and admission waits for the next five in a row.
+
+**The fifth point is still reported as `ANOMALY`.** Admission happens after scoring, and no "regime shift" status is invented. The return to `OK` at 408 is the reference adapting, not the detector announcing that it identified a change point — raw Z-score cannot do that, which is what ADR 0004 and [Known limitations](#9-known-limitations) say.
+
+These sequence numbers hold for the committed defaults, and they are checked rather than asserted. `make smoke` replays this exact walkthrough against the running three-container system — it re-launches Compose with `PRODUCER_LEVEL_SHIFT_ENABLED=true` and a 25 ms interval (the seeded stream depends on the RNG draw order, not on pacing) and requires every line above, verbatim, in the container logs. The two halves are additionally pinned in isolation by `DatapointGeneratorInjectionTest.documentedShiftDemoInterruptsTheFirstRunWithALowInjectionAtSequence402` and `ZScoreDetectorTest.ec06_aLevelShiftAlarmsThenReBaselinesOnceTheOverrideAdmitsTheRun`. Change a producer default, a detector default, or K, and the build fails before this section goes stale.
 
 ## 5. Architecture, topology, and contract
 
@@ -114,7 +139,9 @@ The wire contract is [Draft 2020-12 JSON Schema](contracts/datapoint.v1.schema.j
 }
 ```
 
-`id` supports bounded deduplication, `sequence` supports diagnostics, and `emittedAt` is event time. Values are finite and constrained to `[-1e150, 1e150]`; unknown fields are accepted for forward compatibility. There is no producer ground-truth field such as `syntheticAnomaly`.
+`id` supports bounded deduplication, `sequence` supports diagnostics, and `emittedAt` is event time. Values are finite and constrained to `[-1e150, 1e150]` — squaring the bound stays two orders of magnitude below `Double.MAX_VALUE`, so a full window's sum of squared deviations cannot overflow. Unknown fields are accepted for forward compatibility. There is no producer ground-truth field such as `syntheticAnomaly`.
+
+Two deliberate narrowings of that forward compatibility. `metric` is a `const` in v1 and the consumer rejects anything else to the dead-letter queue: the field exists so per-key windows are a schema change rather than a payload redesign, but admitting a second metric today would silently share one rolling window, which is worse than a loud rejection. And the AMQP `__TypeId__` header carries the logical id `datapoint.v1`, not a Java class name — the consumer ignores it entirely (it binds by the listener's declared type), so no producer package leaks onto the wire.
 
 ### RabbitMQ topology and delivery
 
@@ -186,6 +213,7 @@ Compose reads `.env`; shell environment values can override its interpolation va
 | `DETECTOR_EXCLUDE_ANOMALIES` | `true` | Keep isolated anomaly verdicts out of the reference window |
 | `DETECTOR_CONSECUTIVE_OVERRIDE` | `5` | Consecutive-anomaly admission threshold; 2 through window size |
 | `DETECTOR_SUMMARY_EVERY` | `100` | Successful non-duplicate points between summaries |
+| `PRODUCER_SCHEDULING_ENABLED` | `true` | Set `false` to start the producer without its fixed-rate generator; used by tests |
 | `PRODUCER_INTERVAL_MS` | `250` | Fixed-rate generation interval |
 | `PRODUCER_MEAN` | `100.0` | Baseline normal-distribution mean |
 | `PRODUCER_STDDEV` | `5.0` | Baseline standard deviation; positive |
@@ -227,6 +255,7 @@ At a glance: Java 25 and Spring Boot 4.1 match the implemented toolchain; Rabbit
 | 4.0 | about 0.02% | about twenty minutes |
 
 - Window state, the bounded ID cache, and sequence state are in memory. A restart loses the reference and dedup history, then warms up again; there is no persistence or atomic exactly-once boundary. Processing remembers a successful ID before ack to reduce redelivery double counting, but the system intentionally remains at-least-once.
+- **The producer does not buffer.** Its publish retry spans well under a second, so a broker outage longer than that drops the ticks generated during it — roughly four points per second, never republished. That matches a live sensor (data not sent is data not captured) and keeps a stalled broker from backing up the fixed-rate scheduler, but it means broker durability protects *delivered* points only. A store-and-forward buffer is the fix, and it is not built.
 - There is one metric and one ordered consumer partition. Gaps and out-of-order values are warned about and evaluated in arrival order, not reordered. Bounded per-key multi-metric state with TTL has not been built.
 - Alerts are emitted per anomalous point. There is no alert deduplication, suppression, labelled-data tuning, replay/backfill, or SLO/error-budget policy.
 - Prometheus export is already implemented. The missing observability work is scrape aggregation, retention, alerting, and dashboards—not another metrics endpoint.

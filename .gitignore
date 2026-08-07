@@ -12,6 +12,8 @@
 
 # Package Files #
 *.jar
+# ...but the Maven Wrapper must survive a clone even if it ever ships a jar again
+!.mvn/wrapper/*.jar
 *.war
 *.nar
 *.ear
@@ -34,6 +36,10 @@ consumer/.jqwik-database
 .idea/
 *.iml
 .classpath
+.factorypath
 .project
 .settings/
 .vscode/
+
+# Local agent/tooling scratch
+.serena/

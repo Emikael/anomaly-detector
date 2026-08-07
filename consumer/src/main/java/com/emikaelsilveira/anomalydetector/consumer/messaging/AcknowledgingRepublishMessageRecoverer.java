@@ -1,7 +1,6 @@
 package com.emikaelsilveira.anomalydetector.consumer.messaging;
-import java.util.Objects;
 
-
+import lombok.NonNull;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.ImmediateAcknowledgeAmqpException;
 import org.springframework.amqp.core.Message;
@@ -16,12 +15,11 @@ public final class AcknowledgingRepublishMessageRecoverer implements MessageReco
     private final RepublishMessageRecovererWithConfirms confirmedRecoverer;
     private final FatalMessageErrorHandler fatalMessageErrorHandler;
 
-
     public AcknowledgingRepublishMessageRecoverer(
-            RabbitTemplate rabbitTemplate,
-            FatalMessageErrorHandler fatalMessageErrorHandler
+            @NonNull RabbitTemplate rabbitTemplate,
+            @NonNull FatalMessageErrorHandler fatalMessageErrorHandler
     ) {
-        this.fatalMessageErrorHandler = Objects.requireNonNull(fatalMessageErrorHandler, "fatalMessageErrorHandler");
+        this.fatalMessageErrorHandler = fatalMessageErrorHandler;
         confirmedRecoverer = new RepublishMessageRecovererWithConfirms(
                 rabbitTemplate,
                 RabbitTopology.METRICS_DLX,

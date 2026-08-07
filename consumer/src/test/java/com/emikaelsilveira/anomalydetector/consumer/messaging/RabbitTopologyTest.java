@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RabbitTopologyTest {
 
     @Test
-    void duplicatesTheProducerDurableTopologyExactly() {
+    void pinsTheDurableTopologyLiteralsMirroredByTheOtherModule() {
         assertThat(RabbitTopology.METRICS_EXCHANGE).isEqualTo("metrics.exchange");
         assertThat(RabbitTopology.METRICS_ROUTING_KEY).isEqualTo("metrics.datapoint");
         assertThat(RabbitTopology.DATAPOINT_QUEUE).isEqualTo("metrics.datapoint.q");

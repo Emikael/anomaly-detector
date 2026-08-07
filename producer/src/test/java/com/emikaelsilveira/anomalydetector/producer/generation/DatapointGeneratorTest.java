@@ -12,6 +12,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 import com.emikaelsilveira.anomalydetector.producer.contract.Datapoint;
+import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile.AnomalyProfile;
+import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile.LevelShiftProfile;
+import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile.NoiseProfile;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SchemaRegistryConfig;
@@ -26,6 +29,16 @@ class DatapointGeneratorTest {
 
     private static final ObjectMapper JSON = JsonMapper.builder().findAndAddModules().build();
 
+    /**
+     * The committed defaults with anomalies and the level shift switched off, so every assertion in
+     * this class is about the plain Gaussian baseline and the sigma band never influences a draw.
+     */
+    private static final GenerationProfile NEVER_ANOMALOUS = new GenerationProfile(
+            new NoiseProfile(100.0, 5.0),
+            new AnomalyProfile(0.0, 8.0, 12.0),
+            LevelShiftProfile.disabled()
+    );
+
     @Test
     void startsAtOneAndIncrementsMonotonically() {
         DatapointGenerator generator = generator(new Random(7), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
@@ -34,6 +47,7 @@ class DatapointGeneratorTest {
         assertThat(generator.next().datapoint().sequence()).isEqualTo(2);
         assertThat(generator.next().datapoint().sequence()).isEqualTo(3);
     }
+
 
     @Test
     void equalSeedsProduceTheSameSequenceValueAndEventSchedule() {
@@ -51,12 +65,12 @@ class DatapointGeneratorTest {
         }
     }
 
+
     @Test
     void usesInjectedClockAndUuidAndTruncatesEventTimeToMilliseconds() {
         UUID id = UUID.fromString("0f3a9c1e-6b7d-4a2f-9c11-8de4b5a70c93");
         Clock clock = Clock.fixed(Instant.parse("2026-08-05T14:22:07.361987Z"), ZoneOffset.UTC);
-        DatapointGenerator generator = new DatapointGenerator(
-                new Random(2), clock, () -> id, 100.0, 5.0, 0.0, 8.0, 12.0, false, 400, 10.0);
+        DatapointGenerator generator = new DatapointGenerator(new Random(2), clock, () -> id, NEVER_ANOMALOUS);
 
         Datapoint datapoint = generator.next().datapoint();
 
@@ -64,6 +78,7 @@ class DatapointGeneratorTest {
         assertThat(datapoint.emittedAt()).isEqualTo(Instant.parse("2026-08-05T14:22:07.361Z"));
         assertThat(datapoint.metric()).isEqualTo("sensor.temperature");
     }
+
 
     @Test
     void generatesTheGaussianBaselineValue() {
@@ -74,6 +89,7 @@ class DatapointGeneratorTest {
 
         assertThat(generator.next().datapoint().value()).isEqualTo(expectedValue);
     }
+
     @Test
     void zeroProbabilityKeepsTheGaussianBaselinePath() {
         long seed = 13;
@@ -82,14 +98,7 @@ class DatapointGeneratorTest {
                 new Random(seed),
                 Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
                 () -> UUID.randomUUID(),
-                100.0,
-                5.0,
-                0.0,
-                8.0,
-                12.0,
-                false,
-                400,
-                10.0
+                NEVER_ANOMALOUS
         );
 
         assertThat(generator.next().datapoint().value()).isEqualTo(expectedValue);
@@ -108,8 +117,7 @@ class DatapointGeneratorTest {
     private DatapointGenerator generator(Random random, Clock clock) {
         AtomicLong ids = new AtomicLong();
         Supplier<UUID> idSupplier = () -> new UUID(0, ids.incrementAndGet());
-        return new DatapointGenerator(
-                random, clock, idSupplier, 100.0, 5.0, 0.0, 8.0, 12.0, false, 400, 10.0);
+        return new DatapointGenerator(random, clock, idSupplier, NEVER_ANOMALOUS);
     }
 
     private Schema schema() {

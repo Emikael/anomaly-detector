@@ -8,7 +8,7 @@ import org.springframework.context.ApplicationContext;
 
 @SpringBootTest(
         classes = ProducerApplication.class,
-        properties = "spring.task.scheduling.enabled=false",
+        properties = "producer.scheduling-enabled=false",
         webEnvironment = SpringBootTest.WebEnvironment.NONE
 )
 class ProducerApplicationTest {

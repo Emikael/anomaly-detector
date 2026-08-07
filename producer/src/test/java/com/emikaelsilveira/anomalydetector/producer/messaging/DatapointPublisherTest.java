@@ -3,11 +3,6 @@ package com.emikaelsilveira.anomalydetector.producer.messaging;
 import java.time.Instant;
 import java.util.UUID;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
-
 import com.emikaelsilveira.anomalydetector.producer.contract.Datapoint;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -64,29 +59,6 @@ class DatapointPublisherTest {
 
         assertThatThrownBy(() -> publisher.publish(datapoint())).isSameAs(failure);
     }
-    @Test
-    void logsFinalPublisherFailuresAtErrorLevel() {
-        RabbitTemplate template = mock(RabbitTemplate.class);
-        AmqpConnectException failure = new AmqpConnectException("broker unavailable", new IllegalStateException());
-        doThrow(failure).when(template).convertAndSend(
-                anyString(), anyString(), any(), any(MessagePostProcessor.class), any(CorrelationData.class));
-        Logger logger = (Logger) org.slf4j.LoggerFactory.getLogger(DatapointPublisher.class);
-        ListAppender<ILoggingEvent> appender = new ListAppender<>();
-        appender.start();
-        logger.addAppender(appender);
-        try {
-            assertThatThrownBy(() -> new DatapointPublisher(template).publish(datapoint())).isSameAs(failure);
-
-            assertThat(appender.list).anySatisfy(event -> {
-                assertThat(event.getLevel()).isEqualTo(Level.ERROR);
-                assertThat(event.getFormattedMessage()).contains("Unable to publish datapoint");
-            });
-        } finally {
-            logger.detachAppender(appender);
-            appender.stop();
-        }
-    }
-
 
     private Datapoint datapoint() {
         return new Datapoint(

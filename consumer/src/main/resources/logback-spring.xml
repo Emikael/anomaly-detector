@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  R11 mandates a character-exact console line for every datapoint verdict, so the detection event
+  logger and the periodic summary own stdout verbatim through a dedicated appender.
+
+  That appender is bound to one logger name, not to the classes that write to it: emitters opt in
+  by asking for ConsoleEventLog.NAME. Routing by class would tie this format to a type, so the next
+  WARN or ERROR added to a routed class would silently render as a bare message.
+
+  Everything else keeps Spring Boot's standard pattern. Forcing "%msg%n" globally would satisfy R11
+  too, but it strips the level, logger and thread from every WARN and ERROR in the service — a
+  sequence gap, a dead-lettered payload and a normal verdict would all render identically, which
+  makes the consumer unreadable in exactly the situations where the log matters.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- "!json", not "plain": LOG_FORMAT feeds spring.profiles.active directly, so an unrecognised
+         value would otherwise match neither block, leave the context with no appenders, and make the
+         app die without printing the very validation error that explains why. -->
+    <springProfile name="!json">
+        <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+        <appender name="EVENT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%msg%n</pattern>
+                <charset>${CONSOLE_LOG_CHARSET}</charset>
+            </encoder>
+        </appender>
+
+        <!-- Mirrors ConsoleEventLog.NAME, which XML cannot reference. Change both together. -->
+        <logger name="anomaly.detector.console" additivity="false">
+            <appender-ref ref="EVENT"/>
+        </logger>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Structured output goes to an aggregator, where a bespoke plain-text line has no value. -->
+    <springProfile name="json">
+        <include resource="org/springframework/boot/logging/logback/structured-console-appender.xml"/>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+</configuration>

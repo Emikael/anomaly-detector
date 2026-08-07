@@ -7,10 +7,17 @@ on:
 permissions:
   contents: read
 
+# A superseded push should not keep a runner (and a Docker daemon) busy.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     name: Verify
     runs-on: ubuntu-latest
+    # The smoke test owns containers; without a cap a hang burns the 360-minute default.
+    timeout-minutes: 30
     steps:
       - name: Check out source
         uses: actions/checkout@v4

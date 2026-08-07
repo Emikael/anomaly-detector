@@ -1,5 +1,9 @@
 package com.emikaelsilveira.anomalydetector.producer.config;
 
+import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile;
+import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile.AnomalyProfile;
+import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile.LevelShiftProfile;
+import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile.NoiseProfile;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -11,46 +15,37 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public record ProducerProperties(
         @Min(1) long intervalMs,
-        double mean,
+        @Finite(message = "mean must be finite") double mean,
+        @Finite(message = "stddev must be finite")
         @DecimalMin(value = "0.0", inclusive = false) double stddev,
+        @Finite(message = "anomalyProbability must be finite")
         @DecimalMin("0.0") @DecimalMax("1.0") double anomalyProbability,
+        @Finite(message = "anomalySigmaMin must be finite")
         @DecimalMin(value = "0.0", inclusive = false) double anomalySigmaMin,
+        @Finite(message = "anomalySigmaMax must be finite")
         @DecimalMin(value = "0.0", inclusive = false) double anomalySigmaMax,
         Long seed,
         boolean levelShiftEnabled,
         @Min(1) long levelShiftAtSequence,
+        @Finite(message = "levelShiftSigma must be finite")
         @DecimalMin("0.0") double levelShiftSigma
 ) {
 
-    @AssertTrue(message = "mean must be finite")
-    public boolean isMeanFinite() {
-        return Double.isFinite(mean);
+    /**
+     * Assembles the generator's configuration here rather than in the composition root, which would
+     * otherwise reach through eight accessors to build an object this record already has all the
+     * data for. Only the validated values ever reach a generator.
+     */
+    public GenerationProfile generationProfile() {
+        return new GenerationProfile(
+                new NoiseProfile(mean, stddev),
+                new AnomalyProfile(anomalyProbability, anomalySigmaMin, anomalySigmaMax),
+                new LevelShiftProfile(levelShiftEnabled, levelShiftAtSequence, levelShiftSigma)
+        );
     }
 
-    @AssertTrue(message = "stddev must be finite")
-    public boolean isStddevFinite() {
-        return Double.isFinite(stddev);
-    }
-
-    @AssertTrue(message = "anomalyProbability must be finite")
-    public boolean isAnomalyProbabilityFinite() {
-        return Double.isFinite(anomalyProbability);
-    }
-
-    @AssertTrue(message = "anomalySigmaMin must be finite")
-    public boolean isAnomalySigmaMinFinite() {
-        return Double.isFinite(anomalySigmaMin);
-    }
-
-    @AssertTrue(message = "anomalySigmaMax must be finite")
-    public boolean isAnomalySigmaMaxFinite() {
-        return Double.isFinite(anomalySigmaMax);
-    }
-
-    @AssertTrue(message = "levelShiftSigma must be finite")
-    public boolean isLevelShiftSigmaFinite() {
-        return Double.isFinite(levelShiftSigma);
-    }
+    // Only cross-field rules remain as @AssertTrue: each reads two or more components at once and so
+    // belongs to the record rather than to any single one of them.
 
     @AssertTrue(message = "anomalySigmaMin must not exceed anomalySigmaMax")
     public boolean isAnomalySigmaRangeValid() {

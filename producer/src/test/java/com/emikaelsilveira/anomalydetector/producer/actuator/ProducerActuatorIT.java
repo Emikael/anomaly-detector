@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(
         classes = ProducerApplication.class,
         properties = {
-                "spring.task.scheduling.enabled=false",
+                "producer.scheduling-enabled=false",
                 "spring.rabbitmq.connection-timeout=500ms"
         },
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT

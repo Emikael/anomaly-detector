@@ -4,25 +4,27 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.Locale;
-import java.util.Objects;
 
 import com.emikaelsilveira.anomalydetector.producer.contract.Datapoint;
 import com.emikaelsilveira.anomalydetector.producer.generation.AnomalyInjection;
 import com.emikaelsilveira.anomalydetector.producer.generation.GeneratedDatapoint;
 import com.emikaelsilveira.anomalydetector.producer.generation.LevelShift;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 
+/**
+ * Takes its {@link Logger} by injection rather than declaring a static one, so tests can attach an
+ * appender and assert on the exact rendered line without touching global logging state.
+ */
+@RequiredArgsConstructor
 public final class ProducerEventLogger {
 
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = new DateTimeFormatterBuilder()
             .appendInstant(3)
             .toFormatter();
 
-    private final Logger logger;
-
-    public ProducerEventLogger(Logger logger) {
-        this.logger = Objects.requireNonNull(logger, "logger");
-    }
+    private final @NonNull Logger logger;
 
     public void log(GeneratedDatapoint generatedDatapoint) {
         Datapoint datapoint = generatedDatapoint.datapoint();

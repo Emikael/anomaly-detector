@@ -1,33 +1,23 @@
 package com.emikaelsilveira.anomalydetector.producer.production;
 
-import java.util.Objects;
-
 import com.emikaelsilveira.anomalydetector.producer.generation.DatapointGenerator;
 import com.emikaelsilveira.anomalydetector.producer.generation.GeneratedDatapoint;
 import com.emikaelsilveira.anomalydetector.producer.logging.ProducerEventLogger;
 import com.emikaelsilveira.anomalydetector.producer.messaging.DatapointPublisher;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.springframework.amqp.AmqpException;
 import org.springframework.scheduling.annotation.Scheduled;
 
+@RequiredArgsConstructor
 public final class DatapointProductionService {
 
-    private final DatapointGenerator generator;
-    private final DatapointPublisher publisher;
-    private final ProducerEventLogger eventLogger;
-    private final Logger logger;
-
-    public DatapointProductionService(
-            DatapointGenerator generator,
-            DatapointPublisher publisher,
-            ProducerEventLogger eventLogger,
-            Logger logger
-    ) {
-        this.generator = Objects.requireNonNull(generator, "generator");
-        this.publisher = Objects.requireNonNull(publisher, "publisher");
-        this.eventLogger = Objects.requireNonNull(eventLogger, "eventLogger");
-        this.logger = Objects.requireNonNull(logger, "logger");
-    }
+    private final @NonNull DatapointGenerator generator;
+    private final @NonNull DatapointPublisher publisher;
+    private final @NonNull ProducerEventLogger eventLogger;
+    /** Injected, not static: the publish-failure branch is asserted through a test appender. */
+    private final @NonNull Logger logger;
 
     @Scheduled(fixedRateString = "${producer.interval-ms}")
     public void produce() {

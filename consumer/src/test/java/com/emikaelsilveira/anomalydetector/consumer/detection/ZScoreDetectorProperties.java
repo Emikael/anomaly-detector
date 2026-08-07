@@ -9,10 +9,15 @@ import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
 import net.jqwik.api.constraints.DoubleRange;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.Offset.offset;
 
+/**
+ * Seeds are pinned so CI is reproducible: a property that fails only on some runs is worse than no
+ * property at all in a submission someone else has to execute. Unpin the seeds locally to explore.
+ */
 class ZScoreDetectorProperties {
 
     @Property(tries = 100, seed = "894372")
@@ -45,11 +50,12 @@ class ZScoreDetectorProperties {
         ZScoreDetector detector = new ZScoreDetector(50, 2, 3.0, excludeAnomalies, 5);
 
         for (double value : values) {
-            assertThat(detector.evaluate(value).samples()).isLessThanOrEqualTo(50);
+            assertThat(detector.evaluate(value).referenceSamples()).isLessThanOrEqualTo(50);
         }
     }
 
-    @Property(tries = 1, seed = "42")
+    // Not a property: a single deterministic 10,000-point run, so it takes no @ForAll parameters.
+    @Test
     void fixedSeedPureGaussianAnomalyRateStaysBelowOnePercent() {
         ZScoreDetector detector = new ZScoreDetector(50, 50, 3.0, false, 5);
         Random random = new Random(42);

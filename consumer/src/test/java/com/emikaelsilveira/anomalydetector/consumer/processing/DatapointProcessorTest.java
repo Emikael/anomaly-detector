@@ -80,6 +80,12 @@ class DatapointProcessorTest {
         assertThat(registry.get("anomaly.detector.points.duplicates").counter().count()).isEqualTo(1.0d);
         assertThat(messages(processorAppender)).noneMatch(message -> message.contains("Sequence"));
         assertThat(messages(eventAppender)).hasSize(2);
+        // A duplicate is dropped silently from the verdict stream, so the counter is the only other
+        // trace of it; the drop has to be legible in the log too, not merely tallied.
+        assertThat(messages(processorAppender)).anyMatch(message ->
+                message.contains("Duplicate delivery ignored")
+                        && message.contains("id=" + id)
+                        && message.contains("sequence=99"));
     }
 
     @Test
@@ -94,7 +100,9 @@ class DatapointProcessorTest {
                 .anyMatch(message -> message.contains("expected=2") && message.contains("actual=3"))
                 .anyMatch(message -> message.contains("expected=4") && message.contains("actual=2"));
         assertThat(registry.get("anomaly.detector.points.processed").counter().count()).isEqualTo(3.0d);
-        assertThat(registry.get("anomaly.detector.window.occupancy").gauge().value()).isEqualTo(3.0d);
+        // The gauge tracks the reference window each verdict was scored against, matching the
+        // "Samples"/"Window" figure in the log line, so it trails admission by the current point.
+        assertThat(registry.get("anomaly.detector.window.occupancy").gauge().value()).isEqualTo(2.0d);
     }
 
     @Test

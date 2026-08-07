@@ -62,7 +62,7 @@ class DatapointEventLoggerTest {
                     "value", 152.88d,
                     "status", "ANOMALY",
                     "zScore", 9.84d,
-                    "samples", 50,
+                    "referenceSamples", 50,
                     "capacity", 50,
                     "alert", "Significant deviation detected."
             ));

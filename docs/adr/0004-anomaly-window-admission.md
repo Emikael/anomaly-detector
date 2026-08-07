@@ -14,5 +14,6 @@ The level-shift producer mode exists to demonstrate this policy. Sequence 400 is
 
 - Separated point anomalies remain out of the reference window, reducing masking for the chosen point-outlier problem.
 - Sustained shifts are admitted in K-sized groups and the finite window can re-baseline. The return to `OK` is an adaptation consequence, not proof that a shift was statistically identified.
+- The run counter requires K *consecutive* anomalies, so a single sub-threshold point resets it and discards the buffered values. During a level shift this is not hypothetical: an outlier in the opposite direction can land near the stale baseline, score as `OK`, and delay admission by several points. The committed demo does exactly that at sequence 402 — see README section 4.
 - K=5 is a domain guess. It can admit a burst of unrelated anomalies or delay adaptation; labelled data or an explicit change-point detector is needed to tune or replace it.
 - Pending values, the rolling window, and the policy state are in memory. Restarting the consumer starts cold and loses a partially buffered run.

@@ -1,4 +1,4 @@
-package com.emikaelsilveira.anomalydetector.consumer.logging;
+package com.emikaelsilveira.anomalydetector.consumer.config;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

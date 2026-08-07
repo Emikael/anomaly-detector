@@ -32,8 +32,45 @@
         <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
     </properties>
 
+    <!--
+      Inherited by both modules: every service class that takes collaborators wants the same
+      generated constructor, and a module that forgot the dependency would fail to compile rather
+      than silently lose the annotations.
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
     <build>
         <plugins>
+            <!--
+              JDK 23 dropped implicit annotation processing: a processor merely present on the
+              classpath is no longer run, so Lombok would silently generate nothing and every
+              @RequiredArgsConstructor class would fail to compile. The explicit processor path plus
+              proc=full turns it back on for exactly the processors we declare.
+
+              The corollary: this list is now closed. A processor added later — spring-boot-
+              configuration-processor being the obvious candidate here — must be added below or it
+              will sit on the classpath and never run, failing by producing nothing rather than by
+              erroring.
+            -->
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <proc>full</proc>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
@@ -46,6 +83,26 @@
                         <goals>
                             <goal>integration-test</goal>
                             <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Both modules, so `mvn verify` never reports coverage for only half the reactor. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
                         </goals>
                     </execution>
                 </executions>
