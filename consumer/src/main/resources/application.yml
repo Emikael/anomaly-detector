@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    active: ${LOG_FORMAT:plain}
   rabbitmq:
     publisher-confirm-type: correlated
 
@@ -9,3 +11,7 @@ detector:
   exclude-anomalies: ${DETECTOR_EXCLUDE_ANOMALIES:true}
   consecutive-override: ${DETECTOR_CONSECUTIVE_OVERRIDE:5}
   summary-every: ${DETECTOR_SUMMARY_EVERY:100}
+
+app:
+  logging:
+    format: ${LOG_FORMAT:plain}
