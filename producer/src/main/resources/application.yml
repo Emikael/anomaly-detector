@@ -3,6 +3,14 @@ spring:
     name: anomaly-detector-producer
   profiles:
     active: ${LOG_FORMAT:plain}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+
 
 producer:
   interval-ms: ${PRODUCER_INTERVAL_MS:250}
