@@ -1,5 +1,6 @@
 package com.emikaelsilveira.anomalydetector.consumer.detection;
 
+import java.util.ArrayDeque;
 import java.util.OptionalDouble;
 
 /**
@@ -15,6 +16,7 @@ public final class ZScoreDetector {
     private final double threshold;
     private final boolean excludeAnomalies;
     private final int consecutiveOverride;
+    private final ArrayDeque<Double> pendingAnomalies = new ArrayDeque<>();
 
     public ZScoreDetector(int windowSize, int minSamples, double threshold, boolean excludeAnomalies,
                           int consecutiveOverride) {
@@ -47,9 +49,28 @@ public final class ZScoreDetector {
             }
         }
 
-        window.add(value);
+        admit(value, status);
         return new DetectionResult(status, zScore, window.size(), minSamples, capacity);
     }
+    private void admit(double value, DetectionStatus status) {
+        if (!excludeAnomalies) {
+            window.add(value);
+            return;
+        }
+        if (status != DetectionStatus.ANOMALY) {
+            pendingAnomalies.clear();
+            window.add(value);
+            return;
+        }
+
+        pendingAnomalies.addLast(value);
+        if (pendingAnomalies.size() == consecutiveOverride) {
+            while (!pendingAnomalies.isEmpty()) {
+                window.add(pendingAnomalies.removeFirst());
+            }
+        }
+    }
+
 
 
     private static void validateConfiguration(int windowSize, int minSamples, double threshold,
