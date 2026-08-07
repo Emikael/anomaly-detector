@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: anomaly-detector-producer
+  profiles:
+    active: ${LOG_FORMAT:plain}
+
+producer:
+  interval-ms: ${PRODUCER_INTERVAL_MS:250}
+  mean: ${PRODUCER_MEAN:100.0}
+  stddev: ${PRODUCER_STDDEV:5.0}
+  anomaly-probability: ${PRODUCER_ANOMALY_PROBABILITY:0.02}
+  anomaly-sigma-min: ${PRODUCER_ANOMALY_SIGMA_MIN:8.0}
+  anomaly-sigma-max: ${PRODUCER_ANOMALY_SIGMA_MAX:12.0}
+  seed: ${PRODUCER_SEED:42}
+  level-shift-enabled: ${PRODUCER_LEVEL_SHIFT_ENABLED:false}
+  level-shift-at-sequence: ${PRODUCER_LEVEL_SHIFT_AT_SEQUENCE:400}
+  level-shift-sigma: ${PRODUCER_LEVEL_SHIFT_SIGMA:10.0}
+
+app:
+  logging:
+    format: ${LOG_FORMAT:plain}
