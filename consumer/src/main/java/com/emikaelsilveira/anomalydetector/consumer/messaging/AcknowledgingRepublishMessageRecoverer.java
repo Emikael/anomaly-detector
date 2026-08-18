@@ -10,6 +10,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.retry.MessageRecoverer;
 import org.springframework.amqp.rabbit.retry.RepublishMessageRecovererWithConfirms;
 
+/** Republishes exhausted deliveries to the DLQ with confirms before completing the original message. */
 public final class AcknowledgingRepublishMessageRecoverer implements MessageRecoverer {
 
     private final RepublishMessageRecovererWithConfirms confirmedRecoverer;

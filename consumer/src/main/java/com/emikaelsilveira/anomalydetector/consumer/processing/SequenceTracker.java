@@ -1,5 +1,6 @@
 package com.emikaelsilveira.anomalydetector.consumer.processing;
 
+/** Tracks the sequence high-water mark and classifies gaps or out-of-order arrivals without reordering. */
 public final class SequenceTracker {
 
     private boolean hasObservedSequence;

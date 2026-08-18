@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 
+/** Receives datapoints, delegates ordered processing, and owns manual ack or terminal rejection. */
 @Slf4j
 @RequiredArgsConstructor
 public final class DatapointListener {

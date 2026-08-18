@@ -4,6 +4,7 @@ import java.util.Map;
 
 import lombok.experimental.UtilityClass;
 
+/** Defines the shared RabbitMQ exchange, queue, routing-key, and dead-letter topology constants. */
 @UtilityClass
 public class RabbitTopology {
 

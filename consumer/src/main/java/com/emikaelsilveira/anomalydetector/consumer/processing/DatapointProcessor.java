@@ -12,6 +12,7 @@ import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+/** Orchestrates validation, deduplication, diagnostics, detection, logging, metrics, and ID remembrance. */
 @Slf4j
 @RequiredArgsConstructor
 public final class DatapointProcessor {

@@ -20,6 +20,7 @@ import org.springframework.util.backoff.ExponentialBackOff;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
+/** Configures strict conversion, serialized manual-ack consumption, retry, recovery, and shutdown. */
 @Configuration(proxyBeanMethods = false)
 @EnableRabbit
 public class RabbitConfiguration {

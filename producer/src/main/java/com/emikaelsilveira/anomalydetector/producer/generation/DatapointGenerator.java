@@ -15,6 +15,7 @@ import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile
 import com.emikaelsilveira.anomalydetector.producer.generation.GenerationProfile.LevelShiftProfile;
 import lombok.NonNull;
 
+/** Generates the ordered synthetic signal while tracking sequence and permanent mean-shift state. */
 public final class DatapointGenerator {
 
     public static final String METRIC = "sensor.temperature";

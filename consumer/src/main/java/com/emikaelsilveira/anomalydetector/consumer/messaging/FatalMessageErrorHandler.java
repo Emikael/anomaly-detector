@@ -8,6 +8,7 @@ import org.springframework.amqp.listener.ConditionalRejectingErrorHandler;
 import org.springframework.amqp.support.converter.MessageConversionException;
 import org.springframework.util.ErrorHandler;
 
+/** Counts fatal conversion failures and ensures unconvertible manual deliveries are rejected. */
 @RequiredArgsConstructor
 public final class FatalMessageErrorHandler implements ErrorHandler {
 

@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 
 /**
+ * Logs synthetic datapoint, anomaly-injection, and level-shift events in human and structured form.
+ *
  * Takes its {@link Logger} by injection rather than declaring a static one, so tests can attach an
  * appender and assert on the exact rendered line without touching global logging state.
  */

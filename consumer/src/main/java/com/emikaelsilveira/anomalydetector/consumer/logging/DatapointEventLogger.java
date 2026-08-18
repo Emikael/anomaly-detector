@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 
 /**
+ * Logs detection verdicts as exact human-readable lines with parallel structured fields.
+ *
  * Takes its {@link Logger} by injection rather than declaring a static one, so tests can assert on
  * the character-exact verdict line R11 mandates without touching global logging state.
  */

@@ -16,6 +16,7 @@ import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
+/** Configures producer-side JSON conversion, connection retry, publisher confirms, and returns. */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
 public class RabbitConfiguration {

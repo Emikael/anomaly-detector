@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/** Composes the detector and its validation, state, logging, timing, and metrics collaborators. */
 @Configuration(proxyBeanMethods = false)
 public class ConsumerRuntimeConfiguration {
 

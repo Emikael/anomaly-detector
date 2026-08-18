@@ -2,6 +2,7 @@ package com.emikaelsilveira.anomalydetector.consumer.validation;
 
 import com.emikaelsilveira.anomalydetector.consumer.contract.Datapoint;
 
+/** Enforces the consumer's semantic datapoint contract after JSON conversion. */
 public final class DatapointValidator {
 
     private static final String METRIC = "sensor.temperature";

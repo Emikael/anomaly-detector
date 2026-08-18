@@ -15,6 +15,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/** Composes the producer's generator, publisher, logging, time, identity, and scheduling beans. */
 @Configuration(proxyBeanMethods = false)
 public class ProducerRuntimeConfiguration {
 

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Min;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+/** Binds and validates rolling-window, scoring, admission, deduplication, and summary settings. */
 @ConfigurationProperties(prefix = "detector")
 @Validated
 public record DetectorProperties(

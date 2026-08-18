@@ -4,6 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
+/** Bootstraps the stateful anomaly-detector consumer service. */
 @SpringBootApplication
 @ConfigurationPropertiesScan
 public class ConsumerApplication {

@@ -21,6 +21,7 @@ import io.micrometer.core.instrument.distribution.ValueAtPercentile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Records detector counters, occupancy, score distribution, latency, and periodic console summaries. */
 public final class ConsumerMetrics {
 
     static final String POINTS_PROCESSED = "anomaly.detector.points.processed";

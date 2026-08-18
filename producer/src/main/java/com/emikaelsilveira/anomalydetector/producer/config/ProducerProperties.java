@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Min;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+/** Binds and validates the synthetic signal, anomaly injection, and level-shift settings. */
 @ConfigurationProperties(prefix = "producer")
 @Validated
 public record ProducerProperties(

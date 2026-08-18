@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.springframework.amqp.AmqpException;
 import org.springframework.scheduling.annotation.Scheduled;
 
+/** Runs the scheduled generate-publish-log cycle and reports synchronous publishing failures. */
 @RequiredArgsConstructor
 public final class DatapointProductionService {
 

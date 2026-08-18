@@ -7,6 +7,7 @@ import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+/** Publishes datapoints persistently to the metrics exchange with message and confirm correlation IDs. */
 @RequiredArgsConstructor
 public final class DatapointPublisher {
 

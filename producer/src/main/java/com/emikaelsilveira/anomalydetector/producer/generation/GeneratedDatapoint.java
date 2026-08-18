@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.emikaelsilveira.anomalydetector.producer.contract.Datapoint;
 
+/** Carries a generated wire datapoint together with local synthetic ground-truth events. */
 public record GeneratedDatapoint(
         Datapoint datapoint,
         Optional<AnomalyInjection> anomalyInjection,

@@ -6,7 +6,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/** Access is serialized by the single listener container. */
+/**
+ * Retains a bounded FIFO set of recently processed IDs for in-memory delivery deduplication.
+ * Access is serialized by the single listener container.
+ */
 public final class BoundedIdCache {
 
     private final int capacity;

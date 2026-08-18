@@ -31,6 +31,7 @@ public @interface Finite {
 
     Class<? extends Payload>[] payload() default {};
 
+    /** Implements the finite-number check used by the {@link Finite} constraint. */
     class Validator implements ConstraintValidator<Finite, Double> {
 
         /** Null passes, per the Bean Validation convention that presence is {@code @NotNull}'s job. */

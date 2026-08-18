@@ -9,6 +9,7 @@ import java.util.Objects;
 import com.emikaelsilveira.anomalydetector.consumer.contract.Datapoint;
 import com.emikaelsilveira.anomalydetector.consumer.detection.DetectionResult;
 
+/** Formats each detector result into the required stable console line and structured scalar values. */
 public final class DatapointLogFormatter {
 
     static final String ALERT = "Significant deviation detected.";

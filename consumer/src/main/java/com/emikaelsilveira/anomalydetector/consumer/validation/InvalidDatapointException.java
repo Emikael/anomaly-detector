@@ -1,5 +1,6 @@
 package com.emikaelsilveira.anomalydetector.consumer.validation;
 
+/** Signals a terminal datapoint contract violation while retaining the offending field name. */
 public final class InvalidDatapointException extends RuntimeException {
 
     private final String field;
